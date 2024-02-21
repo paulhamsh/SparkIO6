@@ -14,18 +14,17 @@
  *  
  *  Conection is handled with the two commands:
  *  
- *    sp.start_bt();
- *    sp.connect_to_spark();
+ *    connect_to_all();
  *    
- *  The first starts up bluetooth, the second connects to the amp
  *  
  *  
  *  Messages and presets to and from the amp are then queued and processed.
- *  The essential thing is the have the process() function somewhere in loop() - this handles all the processing of the input and output queues
+ *  The essential thing is the have the spark_process() and app_process() function somewhere in loop() - this handles all the processing of the input queues
  *  
  *  loop() {
  *    ...
- *    sp.process()
+ *    spark_process();
+ *    app_process();
  *    ...
  *    do something
  *    ...
@@ -154,7 +153,7 @@ void dump_processed_block(byte *block, int block_length) {
 // ------------------------------------------------------------------------------------------------------------
 // Routines to process blocks of data to get to msgpack format
 //
-// trim()          - remove the 01fe and f001 headers, add 6 byte header to packet
+// remove_headers() - remove the 01fe and f001 headers, add 6 byte header to packet
 // fix_bit_eight() - add the missing eighth bit to each data byte
 // compact()       - remove the multi-chunk header and the eighth bit byte to get to msgpack data
 // ------------------------------------------------------------------------------------------------------------
@@ -163,7 +162,7 @@ void clone(byte *to, byte *from, int len) {
   memcpy(to, from, len);
 }
 
-// trim()
+// remove_headers())
 // Removes any headers (0x01fe and 0xf001) from the packets and leaves the rest
 // Each new data block starts with a 6 byte header
 // 0  command
@@ -173,7 +172,7 @@ void clone(byte *to, byte *from, int len) {
 // 4  number of checksum errors in the original block
 // 5  sequence number of the original block
 
-int trim(byte *out_block, byte *in_block, int in_len) {
+int remove_headers(byte *out_block, byte *in_block, int in_len) {
   int new_len  = 0;
   int in_pos   = 0;
   int out_pos  = 0;
@@ -358,7 +357,7 @@ void spark_process()
     from_spark_index = 0;
 
     //dump_raw_block(block_from_spark, len);   
-    trim_len = trim(block_from_spark, block_from_spark, len);
+    trim_len = remove_headers(block_from_spark, block_from_spark, len);
     fix_bit_eight(block_from_spark, trim_len);
     len = compact(block_from_spark, block_from_spark, trim_len);
     //dump_processed_block(block_from_spark, len);
@@ -389,7 +388,7 @@ void app_process()
     last_app_was_bad = false;
     from_app_index = 0;
 
-    trim_len = trim(block_from_app, block_from_app, len);
+    trim_len = remove_headers(block_from_app, block_from_app, len);
     fix_bit_eight(block_from_app, trim_len);
     len = compact(block_from_app, block_from_app, trim_len);
     //dump_processed_block(block_from_app, len);
