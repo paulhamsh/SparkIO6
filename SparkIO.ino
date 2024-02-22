@@ -356,7 +356,7 @@ void spark_process()
     last_spark_was_bad = false;
     from_spark_index = 0;
 
-    //dump_raw_block(block_from_spark, len);   
+    dump_raw_block(block_from_spark, len);   
     trim_len = remove_headers(block_from_spark, block_from_spark, len);
     fix_bit_eight(block_from_spark, trim_len);
     len = compact(block_from_spark, block_from_spark, trim_len);
@@ -388,6 +388,7 @@ void app_process()
     last_app_was_bad = false;
     from_app_index = 0;
 
+    dump_raw_block(block_from_app, len); 
     trim_len = remove_headers(block_from_app, block_from_app, len);
     fix_bit_eight(block_from_app, trim_len);
     len = compact(block_from_app, block_from_app, trim_len);
@@ -1062,4 +1063,120 @@ void MessageOut::create_preset(SparkPreset *preset)
   }
   write_byte_no_chksum (uint8_t(out_msg_chksum % 256));  
   end_message();
+}
+
+
+
+int expand(byte *out_block, byte *in_block, int in_len) {
+  int len = 0;
+  int in_pos = 0;
+  int out_pos = 0;
+  int counter = 0;
+
+  int total_chunks;
+  int this_chunk;
+  int this_len;
+  int chunk_size;
+  int last_chunk_size;
+
+  bool multi;
+
+  int command = 0;
+  uint8_t cmd = 0;
+  uint8_t sub = 0;
+  uint8_t sequence = 0;
+
+  int i;
+
+  cmd = in_block[in_pos];
+  sub = in_block[in_pos + 1];
+  command = (cmd << 8) + sub;
+  len = (in_block[in_pos + 2] << 8) + in_block[in_pos + 3];
+  len -= HEADER_LEN;
+  sequence = in_block[in_pos + 5];
+  
+  in_pos += HEADER_LEN;
+  chunk_size = len;
+  multi = false;
+  total_chunks = 1;
+
+  if (command == 0x0101) {
+    chunk_size = 128;
+    multi = true;
+  }
+  if (command == 0x0301) {
+    chunk_size = 25;
+    multi = true;
+  }
+  if (multi)
+    total_chunks = int((len - 1) / chunk_size) + 1;
+
+  last_chunk_size = len % chunk_size;
+  if (last_chunk_size ==0) last_chunk_size == chunk_size;   // an exact number of bytes into the chunks
+
+
+  for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
+    this_len = (this_chunk == total_chunks - 1) ? last_chunk_size : chunk_size;     // how big is the last chunk
+    
+    out_block[out_pos++] = 0xf0;
+    out_block[out_pos++] = 0x01;
+    out_block[out_pos++] = sequence;
+    out_block[out_pos++] = 0;            // space for checksum
+    out_block[out_pos++] = cmd;
+    out_block[out_pos++] = sub;
+
+    counter = 0;
+    // do each data byte
+    for (i = 0; i < this_len; i++) {
+      if (counter % 8 == 0) {
+        out_block[out_pos++] = 0;        // space for bitmap
+        counter++;
+      }
+      if (multi && counter == 1) {       // counter == 1 because we have a first bitmap space
+        out_block[out_pos++] = total_chunks;
+        out_block[out_pos++] = this_chunk;
+        out_block[out_pos++] = this_len;
+        counter += 3;
+      }
+      out_block[out_pos++] = in_block[in_pos++];
+      counter++;
+    }
+    out_block[out_pos++] = 0xf7;
+  }
+  return out_pos;
+}
+
+void add_bit_eight(byte *in_block, int in_len) {
+  int len = 0;
+  int in_pos = 0;
+  int counter = 0;
+  int command = 0;
+
+  byte bitmask;
+  byte bits;
+  int cmd_sub = 0;
+
+  while (in_pos < in_len) {
+    if (len == 0) {
+      command = (in_block[in_pos + 4] << 8) + in_block[in_pos + 5];
+      in_pos += HEADER_LEN;
+      len    -= HEADER_LEN;
+      counter = 0;
+    }
+    else {
+      if (counter % 8 == 0) {
+        bitmask = 1;
+        bits = in_block[in_pos];
+      }
+      else {
+        if (bits & bitmask) {
+          in_block[in_pos] |= 0x80;
+        }
+        bitmask <<= 1;
+      }
+      counter++;
+      len--;
+      in_pos++;
+    }
+  }
 }
