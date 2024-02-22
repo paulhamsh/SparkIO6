@@ -4,7 +4,7 @@
 // Timer routines
 #define TIMER 100000
 #define SPARK_TIMEOUT 200
-#define APP_TIMEOUT 200
+#define APP_TIMEOUT 500
 
 hw_timer_t *timer_sp = NULL;
 
