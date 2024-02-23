@@ -8,17 +8,11 @@
  *  The Preset has all the data for a full preset (amps, effects, values) and can be sent or received from the amp.
  *  The Message handles all other changes - change amp, change effect, change value of an effect parameter, change hardware preset and so on
  *  
- *  The class is initialized by creating an instance such as:
- *  
- *  SparkClass sp;
- *  
  *  Conection is handled with the two commands:
  *  
  *    connect_to_all();
- *    
  *  
- *  
- *  Messages and presets to and from the amp are then queued and processed.
+ *  Messages and presets from the amp and the app are then queued and processed.
  *  The essential thing is the have the spark_process() and app_process() function somewhere in loop() - this handles all the processing of the input queues
  *  
  *  loop() {
@@ -38,7 +32,7 @@
  *     void change_effect(char *pedal1, char *pedal2);    
  *     void change_effect_parameter(char *pedal, int param, float val);
  *     
- *     These all create a message or preset to be sent to the amp when they reach the front of the 'send' queue
+ *     These all create a message or preset which is sent immediately to the app or amp
  *  
  * Receiving functions:
  *     bool get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset *preset);
@@ -62,6 +56,17 @@
  * 
  */
 
+
+/* Data sizes for streaming to and from the Spark are as below.
+ *
+ *                             To Spark                   To App
+ * Data                        128   (0x80)               25   (0x19)  
+ * 8 bit expanded              150   (0x96)               32   (0x20)
+ * With header and trailer     157   (0x9d)               39   (0x29)
+ * 
+ * Packet size                 173   (0xad)               106  (0x6a) 
+ *
+ */
 // UTILITY FUNCTIONS
 
 void uint_to_bytes(unsigned int i, uint8_t *h, uint8_t *l) {
@@ -73,9 +78,6 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
   *i = (h & 0xff) * 256 + (l & 0xff);
 }
 
- 
-// uint8_t chunk_header_from_spark[16]{0x01, 0xfe, 0x00, 0x00, 0x41, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-// uint8_t chunk_header_to_spark[16]  {0x01, 0xfe, 0x00, 0x00, 0x53, 0xfe, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 // ------------------------------------------------------------------------------------------------------------
 // Shared global variables
@@ -83,7 +85,7 @@ void bytes_to_uint(uint8_t h, uint8_t l,unsigned int *i) {
 // block_from_spark holds the raw data from the Spark amp and data is processed in-place
 // block_from_app holds the raw data from the app and data is processed in-place
 // ------------------------------------------------------------------------------------------------------------
-
+#define BLOCK_SIZE 1000
 byte block_from_spark[BLOCK_SIZE];
 byte block_from_app[BLOCK_SIZE];
 
@@ -1113,8 +1115,7 @@ int expand(byte *out_block, byte *in_block, int in_len) {
     total_chunks = int((len - 1) / chunk_size) + 1;
 
   last_chunk_size = len % chunk_size;
-  if (last_chunk_size == 0) last_chunk_size == chunk_size;   // an exact number of bytes into the chunks
-
+  if (last_chunk_size == 0) last_chunk_size = chunk_size;   // an exact number of bytes into the chunks
 
   for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
     this_len = (this_chunk == total_chunks - 1) ? last_chunk_size : chunk_size;     // how big is the last chunk
@@ -1158,6 +1159,9 @@ void add_bit_eight(byte *in_block, int in_len) {
   int chunk_size;
   int last_chunk_size;
 
+  int checksum_pos;
+  int checksum;
+
   bool multi;
 
   int command = 0;
@@ -1189,12 +1193,14 @@ void add_bit_eight(byte *in_block, int in_len) {
     total_chunks = int((in_len - 1) / chunk_size) + 1;
 
   last_chunk_size = in_len % chunk_size;
-  if (last_chunk_size == 0) last_chunk_size == chunk_size;   // an exact number of bytes into the chunks
+  if (last_chunk_size == 0) last_chunk_size = chunk_size;   // an exact number of bytes into the chunks
 
 
   for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
-    this_len = (this_chunk == total_chunks - 1) ? last_chunk_size : chunk_size;     // how big is the last chunk
+    this_len = (this_chunk == total_chunks - 1) ? last_chunk_size : chunk_size;     
     counter = 0;
+    checksum = 0;
+    checksum_pos = in_pos + 3;
     in_pos += CHUNK_HEADER_LEN;
     // do each data byte
     for (i = CHUNK_HEADER_LEN; i < this_len - 1; i++) {   // skip header and trailing f7
@@ -1204,15 +1210,75 @@ void add_bit_eight(byte *in_block, int in_len) {
         bit_pos = in_pos;
       }
       else {
+        checksum ^= in_block[in_pos] & 0x7f;
         if (in_block[in_pos] & 0x80) {
           in_block[in_pos] &= 0x7f;
           in_block[bit_pos] |= bitmask;
+          checksum ^= bitmask;
         };
         bitmask <<= 1;
       };
       counter++;
       in_pos++;
     }
+    in_block[checksum_pos] = checksum;
     in_pos++;    // skip the trailing f7
   }
 }  
+
+
+ 
+uint8_t header_to_app[]    {0x01, 0xfe, 0x00, 0x00, 0x41, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+uint8_t header_to_spark[]  {0x01, 0xfe, 0x00, 0x00, 0x53, 0xfe, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+int add_headers(byte *out_block, byte *in_block, int in_len) {
+  int in_pos;
+  int out_pos;
+
+  int total_chunks;
+  int this_chunk;
+  int this_len;
+  int chunk_size;
+  int last_chunk_size;
+
+  int command;
+  uint8_t cmd;
+  uint8_t sub;
+
+  int i;
+
+  in_pos = 0;
+  out_pos = 0;
+
+  cmd = in_block[in_pos + 4];
+  sub = in_block[in_pos + 5];
+  command = (cmd << 8) + sub;
+
+  chunk_size = in_len;            // default if not a multi-chunk message
+  total_chunks = 1;
+
+  if (command == 0x0101) chunk_size = 157;
+  if (command == 0x0301) chunk_size = 90;
+
+  total_chunks = int((in_len - 1) / chunk_size) + 1;
+
+  last_chunk_size = in_len % chunk_size;
+  if (last_chunk_size == 0) last_chunk_size = chunk_size;   // an exact number of bytes into the chunks
+
+  for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
+    this_len = (this_chunk == total_chunks - 1) ? last_chunk_size : chunk_size;   
+    if (cmd == 0x01 || cmd == 0x02) {
+      // sending to the amp
+      memcpy(&out_block[out_pos], header_to_spark, 16);
+    }
+    else {
+      memcpy(&out_block[out_pos], header_to_app, 16);
+    };
+    out_block[out_pos + 6] = this_len + 16;
+    out_pos += 16;
+    memcpy(&out_block[out_pos], &in_block[in_pos], this_len);
+    out_pos += this_len;
+    in_pos += this_len;
+  }
+  return out_pos;
+}

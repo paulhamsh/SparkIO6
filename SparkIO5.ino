@@ -1,7 +1,4 @@
-#include "SparkComms.h"
 #include "SparkIO.h"
-#include "RingBuffer.h"
-#include "SparkStructures.h"
 #include "testdata.h"
 
 byte get_preset[]{0x01, 0xFE, 0x00, 0x00, 0x53, 0xFE, 0x3C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -12,13 +9,21 @@ byte get_preset[]{0x01, 0xFE, 0x00, 0x00, 0x53, 0xFE, 0x3C, 0x00, 0x00, 0x00, 0x
                   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                   0x00 ,0x00, 0x00, 0x00, 0x00,
                   0xF7};
+
+byte gp_result[] {0x02, 0x01, 0x00, 0x26, 0x00, 0x09, 
+                    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
 int offset = 16;
 int preset_to_get;
 
 unsigned long t;
 bool do_it;
 
-byte new_block[BLOCK_SIZE];
+byte new_block[2000];
+byte new_block2[2000];
 
 void setup() {
   Serial.begin(115200);
@@ -31,11 +36,57 @@ void setup() {
   do_it = false;
   preset_to_get = 0;
 
-  dump_raw_block(blk3_result, sizeof(blk3_result));
-  int new_len = expand(new_block, blk3_result, sizeof(blk3_result));
+  int new_len;
+
+/*
+  //dump_raw_block(blk_result, sizeof(blk_result));
+  new_len = expand(new_block, blk_result, sizeof(blk_result));
+  //dump_processed_block(new_block, new_len);
+  add_bit_eight(new_block, new_len);
+  //dump_processed_block(new_block, new_len);
+  new_len = add_headers(new_block2, new_block, new_len);
+  dump_processed_block(new_block2, new_len);
+  Serial.println(memcmp(new_block2, blk, sizeof(blk)));
+
+  Serial.println("==========");
+
+  //dump_raw_block(blk2_result, sizeof(blk2_result));
+  new_len = expand(new_block, blk2_result, sizeof(blk2_result));
+  //dump_processed_block(new_block, new_len);
+  add_bit_eight(new_block, new_len);
+  //dump_processed_block(new_block, new_len);
+  new_len = add_headers(new_block2, new_block, new_len);
+  dump_processed_block(new_block2, new_len);
+  Serial.println(memcmp(new_block2, blk2, sizeof(blk2)));
+
+  Serial.println("==========");
+
+  //dump_raw_block(blk3_result, sizeof(blk3_result));
+  new_len = expand(new_block, blk3_result, sizeof(blk3_result));
+  //dump_processed_block(new_block, new_len);
+  add_bit_eight(new_block, new_len);
+  //dump_processed_block(new_block, new_len);
+  new_len = add_headers(new_block2, new_block, new_len);
+  dump_processed_block(new_block2, new_len);
+  Serial.println(memcmp(new_block2, blk3, sizeof(blk3)));
+  Serial.println("==========");
+*/
+  //dump_raw_block(block_from_spark, len);   
+  new_len = remove_headers(get_preset, get_preset, sizeof(get_preset));
+  dump_processed_block(get_preset, new_len);
+  fix_bit_eight(get_preset, new_len);
+  dump_processed_block(get_preset, new_len);
+  new_len = compact(get_preset, get_preset, new_len);
+  dump_processed_block(get_preset, new_len);
+
+  Serial.println("^^^^^^^^^");
+  new_len = expand(new_block, get_preset, sizeof(get_preset));
   dump_processed_block(new_block, new_len);
+
   add_bit_eight(new_block, new_len);
   dump_processed_block(new_block, new_len);
+  new_len = add_headers(new_block2, new_block, new_len);
+  dump_processed_block(new_block2, new_len);
 
   Serial.println("STALLED");
   while (true);

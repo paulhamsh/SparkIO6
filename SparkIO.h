@@ -5,10 +5,7 @@
 #include "SparkStructures.h"
 #include "SparkComms.h"
 
-#define BLOCK_SIZE 1000
-
 uint8_t license_key[64];
-bool is_spark_mini = false;
 
 // MESSAGE INPUT CLASS
 class MessageIn
@@ -71,7 +68,7 @@ class MessageOut
     void tuner_on_off(bool onoff);
 
     RingBuffer out_message;
-    int cmd_base = 0x0101;
+    int cmd_base;
     int out_msg_chksum;
 };
 
