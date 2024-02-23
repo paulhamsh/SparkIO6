@@ -88,6 +88,7 @@ byte block_from_spark[BLOCK_SIZE];
 byte block_from_app[BLOCK_SIZE];
 
 #define HEADER_LEN 6
+#define CHUNK_HEADER_LEN 6
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to dump full blocks of data
@@ -1112,7 +1113,7 @@ int expand(byte *out_block, byte *in_block, int in_len) {
     total_chunks = int((len - 1) / chunk_size) + 1;
 
   last_chunk_size = len % chunk_size;
-  if (last_chunk_size ==0) last_chunk_size == chunk_size;   // an exact number of bytes into the chunks
+  if (last_chunk_size == 0) last_chunk_size == chunk_size;   // an exact number of bytes into the chunks
 
 
   for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
@@ -1147,36 +1148,71 @@ int expand(byte *out_block, byte *in_block, int in_len) {
 }
 
 void add_bit_eight(byte *in_block, int in_len) {
-  int len = 0;
   int in_pos = 0;
+  int bit_pos;
   int counter = 0;
+
+  int total_chunks;
+  int this_chunk;
+  int this_len;
+  int chunk_size;
+  int last_chunk_size;
+
+  bool multi;
+
   int command = 0;
+  uint8_t cmd = 0;
+  uint8_t sub = 0;
 
   byte bitmask;
-  byte bits;
-  int cmd_sub = 0;
 
-  while (in_pos < in_len) {
-    if (len == 0) {
-      command = (in_block[in_pos + 4] << 8) + in_block[in_pos + 5];
-      in_pos += HEADER_LEN;
-      len    -= HEADER_LEN;
-      counter = 0;
-    }
-    else {
+  int i;
+
+  cmd = in_block[in_pos + 4];
+  sub = in_block[in_pos + 5];
+  command = (cmd << 8) + sub;
+
+  in_pos = 0;
+  chunk_size = in_len;
+  multi = false;
+  total_chunks = 1;
+
+  if (command == 0x0101) {
+    chunk_size = 157;
+    multi = true;
+  }
+  if (command == 0x0301) {
+    chunk_size = 39;
+    multi = true;
+  }
+  if (multi)
+    total_chunks = int((in_len - 1) / chunk_size) + 1;
+
+  last_chunk_size = in_len % chunk_size;
+  if (last_chunk_size == 0) last_chunk_size == chunk_size;   // an exact number of bytes into the chunks
+
+
+  for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
+    this_len = (this_chunk == total_chunks - 1) ? last_chunk_size : chunk_size;     // how big is the last chunk
+    counter = 0;
+    in_pos += CHUNK_HEADER_LEN;
+    // do each data byte
+    for (i = CHUNK_HEADER_LEN; i < this_len - 1; i++) {   // skip header and trailing f7
       if (counter % 8 == 0) {
+        in_block[in_pos] = 0;        // space for bitmap
         bitmask = 1;
-        bits = in_block[in_pos];
+        bit_pos = in_pos;
       }
       else {
-        if (bits & bitmask) {
-          in_block[in_pos] |= 0x80;
-        }
+        if (in_block[in_pos] & 0x80) {
+          in_block[in_pos] &= 0x7f;
+          in_block[bit_pos] |= bitmask;
+        };
         bitmask <<= 1;
-      }
+      };
       counter++;
-      len--;
       in_pos++;
     }
+    in_pos++;    // skip the trailing f7
   }
-}
+}  

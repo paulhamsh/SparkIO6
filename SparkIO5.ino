@@ -18,9 +18,11 @@ int preset_to_get;
 unsigned long t;
 bool do_it;
 
+byte new_block[BLOCK_SIZE];
+
 void setup() {
   Serial.begin(115200);
-  connect_to_all();
+  //connect_to_all();
   DEBUG("Starting");
 
   ble_passthru = true;
@@ -28,6 +30,15 @@ void setup() {
   t = millis();
   do_it = false;
   preset_to_get = 0;
+
+  dump_raw_block(blk3_result, sizeof(blk3_result));
+  int new_len = expand(new_block, blk3_result, sizeof(blk3_result));
+  dump_processed_block(new_block, new_len);
+  add_bit_eight(new_block, new_len);
+  dump_processed_block(new_block, new_len);
+
+  Serial.println("STALLED");
+  while (true);
 
 }
 
@@ -41,7 +52,7 @@ void loop() {
   int trim_len;
 
   // pre-wait before starting to request presets
-  if (millis() - t > 5000 && !do_it) {
+  if (millis() - t > 10000 && !do_it) {
     do_it = true;
     t = millis();
   };
@@ -66,7 +77,7 @@ void loop() {
   };
 
   
-  if (millis() - t > 2000 && do_it) {
+  if (millis() - t > 10000 && do_it) {
     Serial.println("Sending preset request");
     get_preset[offset + 2] = 0x30; // sequence number
     get_preset[offset + 3] = preset_to_get; //checksum
