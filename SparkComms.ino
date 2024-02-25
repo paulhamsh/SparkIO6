@@ -77,9 +77,11 @@ class MyClientCallback : public BLEClientCallbacks
 {
   void onConnect(BLEClient *pclient) {
     DEBUG("Spark connected");
+    ble_spark_connected = true;   
   }
   void onDisconnect(BLEClient *pclient) {
-    connected_sp = false;         
+    connected_sp = false;    
+    ble_spark_connected = false;     
     DEBUG("Spark disconnected");   
   }
 };
@@ -90,12 +92,14 @@ class MyServerCallback : public BLEServerCallbacks {
   void onConnect(BLEServer *pserver)  {
      if (pserver->getConnectedCount() == 1) {
       DEBUG("App connection event and is connected"); 
+      ble_app_connected = true;
     }
     else {
       DEBUG("App connection event and is not really connected");   
     }
   }
   void onDisconnect(BLEServer *pserver) {
+    ble_app_connected = false;
     DEBUG("App disconnected");
   }
 };
@@ -225,6 +229,7 @@ void connect_spark() {
         } 
       }
       DEBUG("connect_spark(): Spark connected");
+      ble_spark_connected = true;
     }
   }
 }
@@ -234,6 +239,9 @@ bool connect_to_all() {
   int i, j;
   int counts;
   uint8_t b;
+
+  ble_spark_connected = false;
+  ble_app_connected = false;
 
   BLEDevice::init(SPARK_BLE_NAME);
   BLEDevice::setMTU(517);
@@ -306,4 +314,19 @@ bool connect_to_all() {
   got_spark_block = false;
 
   return true;
+}
+
+void send_to_spark(byte *buf, int len) {
+  pSender_sp->writeValue(buf, len, false);
+}
+
+
+void send_to_app(byte *buf, int len) {
+  pCharacteristic_send->setValue(buf, len);
+  pCharacteristic_send->notify(true);
+}
+
+// for some reason getRssi() crashes with two clients!
+int ble_getRSSI() { 
+  return pClient_sp->getRssi();
 }

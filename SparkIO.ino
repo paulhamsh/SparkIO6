@@ -417,6 +417,7 @@ void MessageIn::clear() {
   in_message.clear();
 }
 
+
 void MessageIn::read_byte(uint8_t *b)
 {
   uint8_t a;
@@ -732,12 +733,47 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   return true;
 }
 
+
+// used when sending a preset to Spark to see if a block has been received, will lose the messages until acknowledgement one
+bool MessageIn::check_for_acknowledgement() {
+  uint8_t cmd, sub, len_h, len_l;
+  uint8_t sequence;
+  uint8_t chksum_errors;
+
+  unsigned int len;
+  unsigned int cs;
+   
+  uint8_t junk;
+  int i, j;
+
+  if (in_message.is_empty()) return false;
+
+  read_byte(&cmd);
+  read_byte(&sub);
+  read_byte(&len_h);
+  read_byte(&len_l);
+  read_byte(&chksum_errors);
+  read_byte(&sequence);
+
+  bytes_to_uint(len_h, len_l, &len);
+  bytes_to_uint(cmd, sub, &cs);
+
+  for (i = HEADER_LEN; i < len; i++) read_byte(&junk);
+  if (cs == 0x0401 || cs == 0x0501)  return true;
+  return false;
+};
+
+
 // ------------------------------------------------------------------------------------------------------------
 // MessageOut class
 // 
 // Message formatting routines to create the msgpack 
 // ead messages from the SparkStructure format and place into the out_message ring buffer 
 // ------------------------------------------------------------------------------------------------------------
+
+bool MessageOut::has_message() {
+  return !out_message.is_empty();
+}
 
 void MessageOut::start_message(int cmdsub)
 {
@@ -1068,7 +1104,13 @@ void MessageOut::create_preset(SparkPreset *preset)
   end_message();
 }
 
+void MessageOut::copy_message_to_array(byte *blk, int *len) {
+  out_message.copy_to_array(blk, len);
+}
 
+// ------------------------------------------------------------------------------------------------------------
+// Routines to process the msgpack format into Spark blocks
+// ------------------------------------------------------------------------------------------------------------
 
 int expand(byte *out_block, byte *in_block, int in_len) {
   int len = 0;
@@ -1102,6 +1144,7 @@ int expand(byte *out_block, byte *in_block, int in_len) {
   chunk_size = len;
   multi = false;
   total_chunks = 1;
+  last_chunk_size = len;
 
   if (command == 0x0101) {
     chunk_size = 128;
@@ -1114,7 +1157,11 @@ int expand(byte *out_block, byte *in_block, int in_len) {
   if (multi)
     total_chunks = int((len - 1) / chunk_size) + 1;
 
-  last_chunk_size = len % chunk_size;
+  if (chunk_size != 0) 
+    last_chunk_size = len % chunk_size;
+  else
+    last_chunk_size = 0;
+
   if (last_chunk_size == 0) last_chunk_size = chunk_size;   // an exact number of bytes into the chunks
 
   for (this_chunk = 0; this_chunk < total_chunks; this_chunk++) {
@@ -1225,8 +1272,6 @@ void add_bit_eight(byte *in_block, int in_len) {
     in_pos++;    // skip the trailing f7
   }
 }  
-
-
  
 uint8_t header_to_app[]    {0x01, 0xfe, 0x00, 0x00, 0x41, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 uint8_t header_to_spark[]  {0x01, 0xfe, 0x00, 0x00, 0x53, 0xfe, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -1281,4 +1326,60 @@ int add_headers(byte *out_block, byte *in_block, int in_len) {
     in_pos += this_len;
   }
   return out_pos;
+}
+
+
+// ------------------------------------------------------------------------------------------------------------
+// Routines to send to the app and the amp
+// ------------------------------------------------------------------------------------------------------------
+
+// only need one block out as we won't send to app and amp at same time
+
+byte block_out[BLOCK_SIZE];
+byte block_out_temp[BLOCK_SIZE];
+
+void spark_send() {
+  int len;
+  int command;
+
+  int this_block;
+  int num_blocks;
+  int block_size;
+
+  int last_block_len;
+  int this_len;
+
+  if (spark_message_out.has_message()) {
+    spark_message_out.copy_message_to_array(block_out, &len);
+    len = expand(block_out_temp, block_out, len);
+    add_bit_eight(block_out_temp, len);
+    len = add_headers(block_out, block_out_temp, len);
+
+    // with the 16 byte header, position 4 is 0x53fe for data being sent to Spark, and 0x41ff for data going to the app
+    command = block_out[4];
+    if (command == 0x53)      block_size = 173;
+    else if (command == 0x41) block_size = 106;
+
+    num_blocks = int ((len - 1) / block_size) + 1;
+    last_block_len = len % block_size;
+    for (this_block = 0; this_block < num_blocks; this_block++) {
+      this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
+      send_to_spark(&block_out[this_block * block_size], this_len);
+      //Serial.println("Sent a block");
+
+      if (num_blocks != 1) {   // only do this for the multi blocks
+        bool done = false;
+        unsigned long t;
+        t = millis();
+        while (!done && (millis() - t) < 400) {  // add timeout just in case of no acknowledgeme
+          spark_process();
+          done = spark_message_in.check_for_acknowledgement();
+        };
+      }                             
+    }
+  }
+}
+
+void app_send() {
+  
 }

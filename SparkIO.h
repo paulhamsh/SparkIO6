@@ -14,6 +14,7 @@ class MessageIn
     MessageIn() {};
     void set_from_array(uint8_t *in, int size);
     void clear();
+    bool check_for_acknowledgement();
     bool get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset *preset);
     RingBuffer in_message;
 
@@ -32,6 +33,8 @@ class MessageOut
   public:
     MessageOut(unsigned int base): cmd_base(base) {};
     
+    bool has_message();
+    void copy_message_to_array(byte *blk, int *len);
     // creating messages to send
     void start_message(int cmdsub);
     void end_message();
@@ -76,11 +79,14 @@ class MessageOut
 MessageIn spark_message_in;
 MessageIn app_message_in;
 
-MessageOut spark_message_out(0x0101);
-MessageOut app_message_out(0x0301);
+MessageOut spark_message_out(0x0100);
+MessageOut app_message_out(0x0300);
 
 void spark_process();
 void app_process();
+
+void spark_send();
+void app_send();
 
 #endif
       

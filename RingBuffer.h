@@ -6,6 +6,7 @@ class RingBuffer
   public:
     RingBuffer();
     void set_from_array(uint8_t *b, int size);
+    void copy_to_array(uint8_t *b, int *size);
     bool add(uint8_t b);
     bool get(uint8_t *b);
     bool set_at_index(int ind, uint8_t b);

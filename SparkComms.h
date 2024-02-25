@@ -48,7 +48,15 @@ bool ble_passthru;
 bool connect_to_all();
 void connect_spark();
 
+void send_to_spark(); 
+void send_to_app();
+
+int ble_getRSSI();
+
+
 bool ble_app_connected;
+bool ble_spark_connected;
+
 bool connected_sp;
 bool found_sp;
 

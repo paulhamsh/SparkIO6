@@ -27,7 +27,7 @@ byte new_block2[2000];
 
 void setup() {
   Serial.begin(115200);
-  //connect_to_all();
+  connect_to_all();
   DEBUG("Starting");
 
   ble_passthru = true;
@@ -70,7 +70,7 @@ void setup() {
   dump_processed_block(new_block2, new_len);
   Serial.println(memcmp(new_block2, blk3, sizeof(blk3)));
   Serial.println("==========");
-*/
+
   //dump_raw_block(block_from_spark, len);   
   new_len = remove_headers(get_preset, get_preset, sizeof(get_preset));
   dump_processed_block(get_preset, new_len);
@@ -88,9 +88,14 @@ void setup() {
   new_len = add_headers(new_block2, new_block, new_len);
   dump_processed_block(new_block2, new_len);
 
+  Serial.println("**************");
+  //spark_message_out.change_hardware_preset(0, 3);
+  spark_message_out.create_preset(&my_preset);
+  spark_send();
+
   Serial.println("STALLED");
   while (true);
-
+*/
 }
 
 
@@ -103,7 +108,7 @@ void loop() {
   int trim_len;
 
   // pre-wait before starting to request presets
-  if (millis() - t > 10000 && !do_it) {
+  if (millis() - t > 2000 && !do_it) {
     do_it = true;
     t = millis();
   };
@@ -128,7 +133,8 @@ void loop() {
   };
 
   
-  if (millis() - t > 10000 && do_it) {
+  if (millis() - t > 2000 && do_it) {
+    /*
     Serial.println("Sending preset request");
     get_preset[offset + 2] = 0x30; // sequence number
     get_preset[offset + 3] = preset_to_get; //checksum
@@ -139,9 +145,18 @@ void loop() {
     preset_to_get++;
     if (preset_to_get > 3) preset_to_get = 0;
 
+    */
+    Serial.println("Sending preset");
+    //spark_message_out.get_serial();
+    spark_message_out.create_preset(&my_preset);
+    spark_send();
 
+    spark_message_out.change_hardware_preset(0, 1);
+    spark_send();
     //spark_message_out.change_hardware_preset(0, 1);
+    //spark_send();
     //spark_message_out.out_message.dump3();
+    t = millis();
   };
 
 

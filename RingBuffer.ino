@@ -37,6 +37,16 @@ void RingBuffer::set_from_array(uint8_t *b, int size) {
   t_len = 0;
 }
 
+void RingBuffer::copy_to_array(uint8_t *b, int *size) {
+  int i;
+  for (i = 0; i < len; i++) {
+    b[i] = rb[(st+i) % RB_BUFF_MAX];
+  }
+  *size = i;
+  en = st;
+  len = 0;
+}
+
 
 bool RingBuffer::add(uint8_t b) {
   if (len + t_len < RB_BUFF_MAX) {
