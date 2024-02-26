@@ -359,7 +359,7 @@ void spark_process()
     last_spark_was_bad = false;
     from_spark_index = 0;
 
-    dump_raw_block(block_from_spark, len);   
+    //dump_raw_block(block_from_spark, len);   
     trim_len = remove_headers(block_from_spark, block_from_spark, len);
     fix_bit_eight(block_from_spark, trim_len);
     len = compact(block_from_spark, block_from_spark, trim_len);
@@ -391,7 +391,7 @@ void app_process()
     last_app_was_bad = false;
     from_app_index = 0;
 
-    dump_raw_block(block_from_app, len); 
+    //dump_raw_block(block_from_app, len); 
     trim_len = remove_headers(block_from_app, block_from_app, len);
     fix_bit_eight(block_from_app, trim_len);
     len = compact(block_from_app, block_from_app, trim_len);
@@ -1356,6 +1356,7 @@ void spark_send() {
     len = add_headers(block_out, block_out_temp, len);
 
     // with the 16 byte header, position 4 is 0x53fe for data being sent to Spark, and 0x41ff for data going to the app
+    // although should be onvious from the call used eg spark_send() sends to spark
     direction = block_out[4];
     if (direction == 0x53)      block_size = 173;
     else if (direction == 0x41) block_size = 106;
@@ -1398,6 +1399,7 @@ void app_send() {
     len = add_headers(block_out, block_out_temp, len);
 
     // with the 16 byte header, position 4 is 0x53fe for data being sent to Spark, and 0x41ff for data going to the app
+    // although should be onvious from the call used eg app_send() sends to app
     direction = block_out[4];
     if (direction == 0x53)      block_size = 173;
     else if (direction == 0x41) block_size = 106;

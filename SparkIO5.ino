@@ -1,4 +1,5 @@
 #include "SparkIO.h"
+#include "Spark.h"
 #include "testdata.h"
 
 byte get_preset[]{0x01, 0xFE, 0x00, 0x00, 0x53, 0xFE, 0x3C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -27,7 +28,8 @@ byte new_block2[2000];
 
 void setup() {
   Serial.begin(115200);
-  connect_to_all();
+  //connect_to_all();
+  spark_state_tracker_start();
   DEBUG("Starting");
 
   ble_passthru = true;
@@ -99,9 +101,9 @@ void setup() {
 }
 
 
-unsigned int cmdsub;
+unsigned int cmd_sub;
 SparkMessage message;
-SparkPreset preset;
+SparkPreset pre;
 
 void loop() {
   int len;
@@ -113,39 +115,45 @@ void loop() {
     t = millis();
   };
 
+  if (update_spark_state()) {
+    Serial.println(cmdsub, HEX);
 
+
+
+  };
+/*
   spark_process();
   app_process();
 
-  if (spark_message_in.get_message(&cmdsub, &message, &preset)) {
+  if (spark_message_in.get_message(&cmd_sub, &message, &pre)) {
     t = millis();                              //  add to the delay
     Serial.print("SPK: ");
-    Serial.println(cmdsub, HEX);
-    if (cmdsub == 0x0301) Serial.println(preset.Name);
+    Serial.println(cmd_sub, HEX);
+    if (cmd_sub == 0x0301) Serial.println(preset.Name);
   };
 
 
-  if (app_message_in.get_message(&cmdsub, &message, &preset)) {
+  if (app_message_in.get_message(&cmd_sub, &message, &pre)) {
     t = millis();                              //  add to the delay
     Serial.print("APP: ");
-    Serial.println(cmdsub, HEX);
-    if (cmdsub == 0x0101) Serial.println(preset.Name);
+    Serial.println(cmd_sub, HEX);
+    if (cmd_sub == 0x0101) Serial.println(preset.Name);
   };
 
   
   if (millis() - t > 2000 && do_it) {
-    /*
-    Serial.println("Sending preset request");
-    get_preset[offset + 2] = 0x30; // sequence number
-    get_preset[offset + 3] = preset_to_get; //checksum
-    get_preset[offset + 8] = preset_to_get;
+    
+    //Serial.println("Sending preset request");
+    //get_preset[offset + 2] = 0x30; // sequence number
+    //get_preset[offset + 3] = preset_to_get; //checksum
+    //get_preset[offset + 8] = preset_to_get;
 
-    pSender_sp->writeValue(get_preset, sizeof(get_preset), false);
-    t = millis();
-    preset_to_get++;
-    if (preset_to_get > 3) preset_to_get = 0;
+    //pSender_sp->writeValue(get_preset, sizeof(get_preset), false);
+    //t = millis();
+    //preset_to_get++;
+    //if (preset_to_get > 3) preset_to_get = 0;
 
-    */
+    
     Serial.println("Sending preset");
     //spark_message_out.get_serial();
     spark_message_out.create_preset(&my_preset);
@@ -157,7 +165,8 @@ void loop() {
     //spark_send();
     //spark_message_out.out_message.dump3();
     t = millis();
+    
   };
-
+  */
 
 }
