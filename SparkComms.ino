@@ -160,11 +160,6 @@ class CharacteristicCallbacks: public BLECharacteristicCallbacks {
     std::string s = pCharacteristic->getValue();  // do this to avoid the issue here: https://github.com/h2zero/NimBLE-Arduino/issues/413
     int length = s.size();
 
-    /*
-    memcpy(&from_app[from_app_index], s.c_str(), length);
-    from_app_index += length;
-    */
-
     if (from_app_index + length < BLE_BUFSIZE) {
       memcpy(&from_app[from_app_index], s.c_str(), length);
       from_app_index += length;
@@ -201,9 +196,6 @@ void connect_spark() {
        DEBUG("connect_spark() thinks I was already connected");
     
     if (pClient_sp->connect(sp_device)) {
-#if defined CLASSIC  && !defined HELTEC_WIFI
-      //pClient_sp->setMTU(517);  
-#endif
 
       Serial.print("GetMTU ");
       Serial.println(pClient_sp->getMTU());
@@ -214,18 +206,11 @@ void connect_spark() {
         pSender_sp   = pService_sp->getCharacteristic(C_CHAR1);
         pReceiver_sp = pService_sp->getCharacteristic(C_CHAR2);
         if (pReceiver_sp && pReceiver_sp->canNotify()) {
-#ifdef CLASSIC
-          pReceiver_sp->registerForNotify(notifyCB_sp);
-          p2902_sp = pReceiver_sp->getDescriptor(BLEUUID((uint16_t)0x2902));
-          if (p2902_sp != nullptr)
-             p2902_sp->writeValue((uint8_t*)notifyOn, 2, true);
-#else
           if (!pReceiver_sp->subscribe(true, notifyCB_sp, true)) {
             connected_sp = false;
             DEBUG("Spark disconnected");
             NimBLEDevice::deleteClient(pClient_sp);
           }   
-#endif
         } 
       }
       DEBUG("connect_spark(): Spark connected");
@@ -254,25 +239,14 @@ bool connect_to_all() {
   pServer->setCallbacks(new MyServerCallback());  
   pService = pServer->createService(S_SERVICE);
 
-#ifdef CLASSIC  
-  pCharacteristic_receive = pService->createCharacteristic(S_CHAR1, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
-  pCharacteristic_send = pService->createCharacteristic(S_CHAR2, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-#else
   pCharacteristic_receive = pService->createCharacteristic(S_CHAR1, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   pCharacteristic_send = pService->createCharacteristic(S_CHAR2, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY); 
-#endif
+
 
   pCharacteristic_receive->setCallbacks(&chrCallbacks_r);
   pCharacteristic_send->setCallbacks(&chrCallbacks_s);
-#ifdef CLASSIC
-  pCharacteristic_send->addDescriptor(new BLE2902());
-#endif
-
   pService->start();
-
-#ifndef CLASSIC
   pServer->start(); 
-#endif
 
   pAdvertising = BLEDevice::getAdvertising(); // create advertising instance
   pAdvertising->addServiceUUID(pService->getUUID()); // tell advertising the UUID of our service

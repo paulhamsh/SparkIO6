@@ -1340,7 +1340,7 @@ byte block_out_temp[BLOCK_SIZE];
 
 void spark_send() {
   int len;
-  int command;
+  byte direction;
 
   int this_block;
   int num_blocks;
@@ -1356,9 +1356,9 @@ void spark_send() {
     len = add_headers(block_out, block_out_temp, len);
 
     // with the 16 byte header, position 4 is 0x53fe for data being sent to Spark, and 0x41ff for data going to the app
-    command = block_out[4];
-    if (command == 0x53)      block_size = 173;
-    else if (command == 0x41) block_size = 106;
+    direction = block_out[4];
+    if (direction == 0x53)      block_size = 173;
+    else if (direction == 0x41) block_size = 106;
 
     num_blocks = int ((len - 1) / block_size) + 1;
     last_block_len = len % block_size;
@@ -1371,7 +1371,7 @@ void spark_send() {
         bool done = false;
         unsigned long t;
         t = millis();
-        while (!done && (millis() - t) < 400) {  // add timeout just in case of no acknowledgeme
+        while (!done && (millis() - t) < 400) {  // add timeout just in case of no acknowledgement
           spark_process();
           done = spark_message_in.check_for_acknowledgement();
         };
@@ -1381,5 +1381,33 @@ void spark_send() {
 }
 
 void app_send() {
-  
+  int len;
+  byte direction;
+
+  int this_block;
+  int num_blocks;
+  int block_size;
+
+  int last_block_len;
+  int this_len;
+
+  if (spark_message_out.has_message()) {
+    app_message_out.copy_message_to_array(block_out, &len);
+    len = expand(block_out_temp, block_out, len);
+    add_bit_eight(block_out_temp, len);
+    len = add_headers(block_out, block_out_temp, len);
+
+    // with the 16 byte header, position 4 is 0x53fe for data being sent to Spark, and 0x41ff for data going to the app
+    direction = block_out[4];
+    if (direction == 0x53)      block_size = 173;
+    else if (direction == 0x41) block_size = 106;
+
+    num_blocks = int ((len - 1) / block_size) + 1;
+    last_block_len = len % block_size;
+    for (this_block = 0; this_block < num_blocks; this_block++) {
+      this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
+      send_to_app(&block_out[this_block * block_size], this_len);
+      //Serial.println("Sent a block");
+    }
+  }
 }
