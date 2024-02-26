@@ -199,7 +199,7 @@ bool  update_spark_state() {
     // all the processing for UI update
     switch (cmdsub) {
       case 0x0201:  
-         if (ui_update_in_progress) {
+        if (ui_update_in_progress) {
            Serial.println("Updating UI");
 
            strcpy(presets[5].Name, "SyncPreset");
@@ -233,10 +233,9 @@ bool  update_spark_state() {
 
 void update_ui() {
   ble_passthru = false;
-    
+  ui_update_in_progress = true;    
   app_message_out.save_hardware_preset(0x00, 0x03);
   app_send();
-  ui_update_in_progress = true;
 }
 
 ///// ROUTINES TO CHANGE AMP SETTINGS

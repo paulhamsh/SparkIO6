@@ -153,6 +153,15 @@ void dump_processed_block(byte *block, int block_length) {
   Serial.println();
 }
 
+
+// ------------------------------------------------------------------------------------------------------------
+// Global variables
+//
+// last_sequence_to_spark used for a response to a 0x0201 request for a preset - must have the same sequence in the response
+// ------------------------------------------------------------------------------------------------------------
+int last_sequence_to_spark;
+
+
 // ------------------------------------------------------------------------------------------------------------
 // Routines to process blocks of data to get to msgpack format
 //
@@ -229,6 +238,8 @@ int remove_headers(byte *out_block, byte *in_block, int in_len) {
       out_pos++;
     }
   }
+  // keep a global record of the sequence number
+  last_sequence_to_spark = sequence;
   return out_pos;
 }
 
@@ -787,7 +798,7 @@ void MessageOut::start_message(int cmdsub)
   out_message.add(0);      // placeholder for length
   out_message.add(0);      // placeholder for length
   out_message.add(0);      // placeholder for checksum errors
-  out_message.add(0);      // placeholder for sequence number
+  out_message.add(0x60);   // placeholder for sequence number - setting to 0 will not work!
 
   out_msg_chksum = 0;
 }
@@ -1154,6 +1165,10 @@ int expand(byte *out_block, byte *in_block, int in_len) {
     chunk_size = 25;
     multi = true;
   }
+  // using the global as this should be a response to a 0x201
+  if (command == 0x0301) 
+    sequence = last_sequence_to_spark;
+
   if (multi)
     total_chunks = int((len - 1) / chunk_size) + 1;
 
@@ -1409,7 +1424,6 @@ void app_send() {
     for (this_block = 0; this_block < num_blocks; this_block++) {
       this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
       send_to_app(&block_out[this_block * block_size], this_len);
-      //Serial.println("Sent a block");
     }
   }
 }

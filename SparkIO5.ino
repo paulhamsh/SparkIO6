@@ -104,6 +104,7 @@ void setup() {
 unsigned int cmd_sub;
 SparkMessage message;
 SparkPreset pre;
+int p = 0;
 
 void loop() {
   int len;
@@ -118,15 +119,24 @@ void loop() {
 
 
   if (update_spark_state()) {
+    t = millis();
     //Serial.println(cmdsub, HEX);
   };
 
 if (millis() - t > 10000 && do_it) {
     Serial.println("Sending preset and update ui");
-    spark_message_out.create_preset(&my_preset);
+    //spark_message_out.create_preset(&my_preset);
+    //spark_send();
+    spark_message_out.change_hardware_preset(0, p);
     spark_send();
-    spark_message_out.change_hardware_preset(0, 1);
-    spark_send();
+    app_message_out.change_hardware_preset(0, p);
+    app_send();
+
+    //app_message_out.save_hardware_preset(0x00, p++); //0x03);
+    //app_send();
+
+    p++;
+    if (p > 3) p = 0;
 
     update_ui();
 
