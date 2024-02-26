@@ -110,17 +110,31 @@ void loop() {
   int trim_len;
 
   // pre-wait before starting to request presets
-  if (millis() - t > 2000 && !do_it) {
+  if (millis() - t > 10000 && !do_it) {
     do_it = true;
     t = millis();
   };
 
+
+
   if (update_spark_state()) {
-    Serial.println(cmdsub, HEX);
-
-
-
+    //Serial.println(cmdsub, HEX);
   };
+
+if (millis() - t > 10000 && do_it) {
+    Serial.println("Sending preset and update ui");
+    spark_message_out.create_preset(&my_preset);
+    spark_send();
+    spark_message_out.change_hardware_preset(0, 1);
+    spark_send();
+
+    update_ui();
+
+    t = millis();
+    
+  };
+
+
 /*
   spark_process();
   app_process();

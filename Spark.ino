@@ -212,6 +212,7 @@ bool  update_spark_state() {
            
            app_message_out.change_hardware_preset(0x00, 0x00);
            app_send();
+           delay(100);
            app_message_out.change_hardware_preset(0x00, 0x03);     
            app_send();
 

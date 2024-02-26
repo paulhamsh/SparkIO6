@@ -1392,7 +1392,7 @@ void app_send() {
   int last_block_len;
   int this_len;
 
-  if (spark_message_out.has_message()) {
+  if (app_message_out.has_message()) {
     app_message_out.copy_message_to_array(block_out, &len);
     len = expand(block_out_temp, block_out, len);
     add_bit_eight(block_out_temp, len);

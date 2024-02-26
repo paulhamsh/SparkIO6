@@ -197,8 +197,8 @@ void connect_spark() {
     
     if (pClient_sp->connect(sp_device)) {
 
-      Serial.print("GetMTU ");
-      Serial.println(pClient_sp->getMTU());
+      //Serial.print("GetMTU ");
+      //Serial.println(pClient_sp->getMTU());
 
       connected_sp = true;
       pService_sp = pClient_sp->getService(SpServiceUuid);
