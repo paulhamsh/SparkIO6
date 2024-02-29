@@ -116,8 +116,6 @@ void loop() {
     t = millis();
   };
 
-
-
   if (update_spark_state()) {
     t = millis();
     //Serial.println(cmdsub, HEX);
@@ -131,13 +129,13 @@ if (millis() - t > 10000 && do_it) {
     spark_send();
     app_message_out.change_hardware_preset(0, p);
     app_send();
-
+    delay(200);
     //app_message_out.save_hardware_preset(0x00, p++); //0x03);
     //app_send();
 
     p++;
     if (p > 3) p = 0;
-
+    
     update_ui();
 
     t = millis();

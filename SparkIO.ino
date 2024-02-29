@@ -238,8 +238,9 @@ int remove_headers(byte *out_block, byte *in_block, int in_len) {
       out_pos++;
     }
   }
-  // keep a global record of the sequence number
+  // keep a global record of the sequence number for a response to an 0x0201
   last_sequence_to_spark = sequence;
+
   return out_pos;
 }
 
@@ -1166,6 +1167,7 @@ int expand(byte *out_block, byte *in_block, int in_len) {
     multi = true;
   }
   // using the global as this should be a response to a 0x201
+  // TODO - think of a better way to do this
   if (command == 0x0301) 
     sequence = last_sequence_to_spark;
 

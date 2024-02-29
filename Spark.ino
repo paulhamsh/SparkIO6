@@ -3,7 +3,6 @@
 ///// ROUTINES TO SYNC TO AMP SETTINGS
 
 int selected_preset;
-bool ui_update_in_progress;
 int preset_requested;
 bool preset_received;
 unsigned long sync_timer;
@@ -20,18 +19,99 @@ int get_effect_index(char *str) {
   return ind;
 }
 
+bool wait_for_spark(int command_expected) {
+  bool got_it = false;
+  unsigned long time_now;
 
-bool  spark_state_tracker_start() {
+  time_now = millis();
+
+  while (!got_it && millis() - time_now < 2000) {
+    spark_process();
+    if (spark_message_in.get_message(&cmdsub, &msg, &preset)) {
+      got_it = (cmdsub == command_expected);    
+    }
+  }
+  // if got_it is false, this is a timeout
+  return got_it;
+};
+
+bool wait_for_app(int command_expected) {
+  bool got_it = false;
+  unsigned long time_now;
+
+  time_now = millis();
+
+  while (!got_it && millis() - time_now < 2000) {
+    app_process();
+    if (app_message_in.get_message(&cmdsub, &msg, &preset)) {
+      Serial.println(cmdsub, HEX);
+      got_it = (cmdsub == command_expected);    
+    }
+  }
+  // if got_it is false, this is a timeout
+  return got_it;
+};
+
+
+bool spark_state_tracker_start() {
+  bool got;
+  int pres;
+
   spark_state = SPARK_DISCONNECTED;
   // try to find and connect to Spark - returns false if failed to find Spark
   if (!connect_to_all()) return false;    
                 
-  //spark_start(true);                  // set up the classes to communicate with Spark and app
   spark_state = SPARK_CONNECTED;     // it has to be to have reached here
-
   spark_ping_timer = millis();
   selected_preset = 0;
-  ui_update_in_progress = false;
+
+  // Get serial number
+  spark_message_out.get_serial();
+  spark_send();
+  got = wait_for_spark(0x0323);
+  if (got) Serial.println("SERIAL!");
+  else Serial.println("NO SERIAL");
+
+  // Get firmware version
+  spark_message_out.get_firmware();
+  spark_send();
+  got = wait_for_spark(0x032f);
+  if (got) Serial.println("FW!");
+  else Serial.println("NO FW");
+
+  // Get
+  spark_message_out.get_checksum_info();
+  spark_send();
+  got = wait_for_spark(0x032a);
+  if (got) Serial.println("CHECKSUM!");
+  else Serial.println("NO CHECKSUM");
+
+
+  // Get the presets
+  int i = 0;
+  while (i <= 4 ) {
+    pres = (i == 4) ? 0x0100 : i;
+    spark_message_out.get_preset_details(pres);
+    spark_send();
+    got = wait_for_spark(0x0301);
+
+    pres = (preset.preset_num == 0x7f) ? 4 : preset.preset_num;
+    if (preset.curr_preset == 0x01)
+      pres = 5;
+    presets[pres] = preset;
+
+    if (got) {
+      i++;
+      Serial.print("PRESET: "); 
+      Serial.println(pres);
+    }
+    else {
+      Serial.print("MISSED PRESET: "); 
+      Serial.println(pres);
+    };
+  }
+  spark_state = SPARK_SYNCED;
+  Serial.println("END OF SETUP");
   return true;
 }
 
@@ -40,60 +120,12 @@ bool  spark_state_tracker_start() {
 
 bool  update_spark_state() {
   int pres, ind;
-
+  
   // sort out connection and sync progress
   if (ble_spark_connected == false && spark_state != SPARK_DISCONNECTED) {
     spark_state = SPARK_DISCONNECTED;
     spark_ping_timer = millis();
     DEBUG("Spark disconnected, try to reconnect...");
-  }
-
-
-  if (spark_state == SPARK_DISCONNECTED) {
-    if (millis() - spark_ping_timer > 100) {
-      spark_ping_timer = millis();
-      connect_spark();  // reconnects if any disconnects happen    
-    }
-  }
-
-  if (ble_spark_connected == true && spark_state == SPARK_DISCONNECTED) {
-    spark_state = SPARK_CONNECTED;
-    DEBUG("Spark connected");
-  }
-
-  if (spark_state == SPARK_CONNECTED) {
-    if (millis() - spark_ping_timer > 500) {
-      // every 0.5s ping the Spark amp to see if it will respond
-      spark_ping_timer = millis();
-      spark_message_out.get_serial();
-      spark_send();
-      DEBUG("Pinging Spark");  
-    }  
-  }
-  
-  if (spark_state == SPARK_SYNCING) {  
-    if (preset_received == true || millis() - sync_timer > 4000) { // we got the preset we were after or time out, and need to ask for the next one
-      if (preset_received == false) 
-        DEBUG("**** Preset not received, trying again");
-      sync_timer = millis();
-      spark_message_out.get_preset_details((preset_requested == 5) ? 0x0100 : preset_requested);
-      spark_send();
-//      if (preset_requested <= 3)
-//        spark_message_out.change_hardware_preset(0, preset_requested);
-      preset_received = false;
-      Serial.print("Requested a preset: ");  
-      Serial.println(preset_requested);
-    }
-  }
-
-  if (spark_state == SPARK_COMMUNICATING) {
-    spark_message_out.get_firmware();
-    spark_send();
-    spark_message_out.get_checksum_info();
-    spark_send();
-    preset_requested = 0;
-    preset_received = true;
-    spark_state = SPARK_CHECKSUM;
   }
 
   spark_process();
@@ -108,48 +140,18 @@ bool  update_spark_state() {
 
     // all the processing for sync
     switch (cmdsub) {
-      // if serial number response then we know the connection is good
-      case 0x0323:
-        if (spark_state == SPARK_CONNECTED) {
-          spark_state = SPARK_COMMUNICATING;
-          DEBUG("Received serial number, got connection");
-        }
-        break;
-      case 0x032a:
-        if (spark_state == SPARK_CHECKSUM) {
-          spark_state = SPARK_SYNCING;
-          sync_timer = millis();
-          DEBUG("Got checksum");
-        }
-        break; 
       // full preset details
       case 0x0301:  
       case 0x0101:
         pres = (preset.preset_num == 0x7f) ? 4 : preset.preset_num;
         if (preset.curr_preset == 0x01)
           pres = 5;
-
         presets[pres] = preset;
 
         Serial.print("Got preset ");
         Serial.println(pres);
-        
-        if (spark_state == SPARK_SYNCING) {
-          if (!preset_received) {
-            if (preset_requested == pres) {
-              preset_received = true;
-              preset_requested++;
-              if (preset_requested == 4) // can't ask for 4!
-                preset_requested++;
-            }
-          }
-          if (pres == 5) {
-            spark_state = SPARK_SYNCED;
-            ble_passthru = true;
-            DEBUG("Fully synced now");
-          }
-        }
         break;
+
       // change of amp model
       case 0x0306:
         strcpy(presets[5].effects[3].EffectName, msg.str2);
@@ -195,36 +197,6 @@ bool  update_spark_state() {
       default:
         break;
     }
-
-    // all the processing for UI update
-    switch (cmdsub) {
-      case 0x0201:  
-        if (ui_update_in_progress) {
-           Serial.println("Updating UI");
-
-           strcpy(presets[5].Name, "SyncPreset");
-           strcpy(presets[5].UUID, "F00DF00D-FEED-0123-4567-987654321000");  
-           presets[5].curr_preset = 0x00;
-           presets[5].preset_num = 0x03;
-           app_message_out.create_preset(&presets[5]);
-           app_send();
-           delay(100);
-           
-           app_message_out.change_hardware_preset(0x00, 0x00);
-           app_send();
-           delay(100);
-           app_message_out.change_hardware_preset(0x00, 0x03);     
-           app_send();
-
-//           spark_message_out.change_hardware_preset(0x00, 0x7f);     
-//           spark_process();
-
-           ble_passthru = true;
-           ui_update_in_progress = false;
-         }
-       break;
-    }
-          
     return true;
   }
   else
@@ -232,10 +204,26 @@ bool  update_spark_state() {
 }
 
 void update_ui() {
+  bool got;
+
   ble_passthru = false;
-  ui_update_in_progress = true;    
   app_message_out.save_hardware_preset(0x00, 0x03);
   app_send();
+  Serial.println("Updating UI");
+  got = wait_for_app(0x0201);
+  if (got) {
+    strcpy(presets[5].Name, "SyncPreset");
+    strcpy(presets[5].UUID, "F00DF00D-FEED-0123-4567-987654321000");  
+    presets[5].curr_preset = 0x00;
+    presets[5].preset_num = 0x03;
+    app_message_out.create_preset(&presets[5]);
+    app_send();
+    delay(100);
+  }
+  else {
+    Serial.println("Didn't capture the new preset");
+  }
+  ble_passthru = true;
 }
 
 ///// ROUTINES TO CHANGE AMP SETTINGS
