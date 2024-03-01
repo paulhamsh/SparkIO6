@@ -118,6 +118,8 @@ bool spark_state_tracker_start() {
   }
   spark_state = SPARK_SYNCED;
   Serial.println("END OF SETUP");
+
+  spark_ping_timer = millis();
   return true;
 }
 
@@ -128,10 +130,13 @@ bool  update_spark_state() {
   int pres, ind;
   
   // sort out connection and sync progress
-  if (ble_spark_connected == false && spark_state != SPARK_DISCONNECTED) {
+  if (ble_spark_connected == false) {
     spark_state = SPARK_DISCONNECTED;
-    spark_ping_timer = millis();
     DEBUG("Spark disconnected, try to reconnect...");
+    if (millis() - spark_ping_timer > 100) {
+      spark_ping_timer = millis();
+      connect_spark();  // reconnects if any disconnects happen    
+    }
   }
 
   spark_process();
