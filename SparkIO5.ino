@@ -42,8 +42,6 @@ void setup() {
   spark_state_tracker_start();
   DEBUG("Starting");
 
-  ble_passthru = true;
-
   t = millis();
   do_it = false;
   preset_to_get = 0;
