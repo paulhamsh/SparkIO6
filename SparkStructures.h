@@ -36,7 +36,7 @@ typedef struct {
 
 
 
-SparkPreset my_preset{0x00,0x01,"F00DF00D-FEED-0123-4567-987654321004","Paul Preset","0.7","Nothing Here","icon.png",120.000000,{ 
+SparkPreset my_preset{0x00,0x03,"F00DF00D-FEED-0123-4567-987654321004","Paul Preset","0.7","Nothing Here","icon.png",120.000000,{ 
   {"bias.noisegate", true, 2, {0.316873, 0.304245}}, 
   {"Compressor", false, 2, {0.341085, 0.665754}}, 
   {"Booster", true, 1, {0.661412}}, 

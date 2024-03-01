@@ -1,7 +1,7 @@
 #ifndef SparkComms_h
 #define SparkComms_h
 
-enum {S40=0, MINI, GO} spark_type;
+enum {S40=0, MINI, GO} spark_type = MINI;
 char *ble_names[]{"Spark 40 BLE", "Spark MINI BLE", "Spark GO BLE"};
 
 #define SPARK_BLE_NAME  "Spark 40 BLE"

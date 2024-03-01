@@ -88,20 +88,26 @@ bool spark_state_tracker_start() {
 
 
   // Get the presets
-  int i = 0;
-  while (i <= 4 ) {
-    pres = (i == 4) ? 0x0100 : i;
-    spark_message_out.get_preset_details(pres);
+  int preset_to_get = 0;
+  bool got_all_presets = false;
+  while (!got_all_presets) {
+    //pres = (i == 4) ? 0x0100 : i;
+    spark_message_out.get_preset_details(preset_to_get);
     spark_send();
     got = wait_for_spark(0x0301);
 
-    pres = (preset.preset_num == 0x7f) ? 4 : preset.preset_num;
-    if (preset.curr_preset == 0x01)
+    //pres = (preset.preset_num == 0x7f) ? 4 : preset.preset_num;
+    pres = preset.preset_num; // won't get an 0x7f
+    if (preset.curr_preset == 0x01) {
       pres = 5;
+      got_all_presets = true;
+    }
     presets[pres] = preset;
+    //dump_preset(&presets[pres]);
 
     if (got) {
-      i++;
+      preset_to_get++;
+      if (preset_to_get == 4) preset_to_get = 0x0100;
       Serial.print("PRESET: "); 
       Serial.println(pres);
     }
@@ -147,11 +153,10 @@ bool  update_spark_state() {
         if (preset.curr_preset == 0x01)
           pres = 5;
         presets[pres] = preset;
-
+        //dump_preset(&presets[pres]);
         Serial.print("Got preset ");
         Serial.println(pres);
         break;
-
       // change of amp model
       case 0x0306:
         strcpy(presets[5].effects[3].EffectName, msg.str2);
@@ -209,6 +214,7 @@ void update_ui() {
   ble_passthru = false;
   app_message_out.save_hardware_preset(0x00, 0x03);
   app_send();
+
   Serial.println("Updating UI");
   got = wait_for_app(0x0201);
   if (got) {
@@ -219,6 +225,10 @@ void update_ui() {
     app_message_out.create_preset(&presets[5]);
     app_send();
     delay(100);
+    app_message_out.change_hardware_preset(0x00, 0x00);
+    app_send();
+    app_message_out.change_hardware_preset(0x00, 0x03);     
+    app_send();
   }
   else {
     Serial.println("Didn't capture the new preset");

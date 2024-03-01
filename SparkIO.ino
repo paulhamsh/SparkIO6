@@ -303,14 +303,15 @@ int compact(byte *out_block, byte *in_block, int in_len) {
     if (len == 0) {
       // start of new block so prepare header and new out_base pointer
       out_base = out_pos;
-      len  = (in_block[in_pos + 2] << 8) + in_block[in_pos + 3];
+      command = (in_block[in_pos] << 8) +     in_block[in_pos + 1];
+      len     = (in_block[in_pos + 2] << 8) + in_block[in_pos + 3];
       // fill in the out header (length will change!)
-      memcpy(&out_block[out_base], &in_block[in_pos], HEADER_LEN);
-      command = (in_block[in_pos] << 8) + in_block[in_pos + 1];
+      memcpy(&out_block[out_base], &in_block[in_pos], HEADER_LEN);      
       in_pos  += HEADER_LEN;
       out_pos += HEADER_LEN;
       len     -= HEADER_LEN;
       counter = 0;
+
     }
     // if len is not 0
     else {
@@ -318,7 +319,7 @@ int compact(byte *out_block, byte *in_block, int in_len) {
       if (counter % 8 == 0) {      
         in_pos++;
       }
-      // this is the multi-chunk header from the app - perhaps do some checks on this in future
+      // this is the multi-chunk header - perhaps do some checks on this in future
       else if ((command == 0x0301 || command == 0x0101 ) && (counter >= 1 && counter <= 3)) { 
         if (counter == 1) total_chunks = in_block[in_pos++];
         if (counter == 2) this_chunk   = in_block[in_pos++];
@@ -460,7 +461,7 @@ void MessageIn::read_string(char *str)
   }
   else {
     read_byte(&a);
-    if (a < 0xa0 || a >= 0xc0) DEBUG("Bad string");
+    if (a < 0xa0 || a >= 0xc0) DEBUG("Bad read_string");
     len = a - 0xa0;
   }
 
@@ -486,7 +487,7 @@ void MessageIn::read_prefixed_string(char *str)
   read_byte(&a); 
   read_byte(&a);
 
-  if (a < 0xa0 || a >= 0xc0) DEBUG("Bad string");
+  if (a < 0xa0 || a >= 0xc0) DEBUG("Bad read_prefixed_string");
   len = a-0xa0;
 
   if (len > 0) {
@@ -1382,7 +1383,7 @@ void spark_send() {
     last_block_len = len % block_size;
     for (this_block = 0; this_block < num_blocks; this_block++) {
       this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
-      send_to_spark(&block_out[this_block * block_size], this_len);
+      send_to_spark(&block_out[this_block * block_size + 16], this_len - 16);
       //Serial.println("Sent a block");
 
       if (num_blocks != 1) {   // only do this for the multi blocks
@@ -1425,7 +1426,7 @@ void app_send() {
     last_block_len = len % block_size;
     for (this_block = 0; this_block < num_blocks; this_block++) {
       this_len = (this_block == num_blocks - 1) ? last_block_len : block_size;
-      send_to_app(&block_out[this_block * block_size], this_len);
+      send_to_app(&block_out[this_block * block_size + 16], this_len - 16);
     }
   }
 }

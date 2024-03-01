@@ -267,7 +267,8 @@ bool connect_to_all() {
       device = pResults.getDevice(i);
 
       if (device.isAdvertisingService(SpServiceUuid)) {
-        DEBUG("Found Spark");
+        DEBUG("Found ");
+        DEBUG(device.getName().c_str());
         found_sp = true;
         connected_sp = false;
         sp_device = new BLEAdvertisedDevice(device);
