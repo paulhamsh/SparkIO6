@@ -233,6 +233,9 @@ bool connect_to_all() {
   pClient_sp = BLEDevice::createClient();
   pClient_sp->setClientCallbacks(new MyClientCallback());
  
+  BLEDevice::getScan()->setInterval(40);
+  BLEDevice::getScan()->setWindow(40);
+  BLEDevice::getScan()->setActiveScan(true);
   pScan = BLEDevice::getScan();
 
   pServer = BLEDevice::createServer();
