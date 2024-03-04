@@ -60,10 +60,11 @@ bool spark_state_tracker_start() {
   spark_state = SPARK_DISCONNECTED;
   ble_passthru = true;
   // try to find and connect to Spark - returns false if failed to find Spark
-  while (!connect_to_all()) {
-    DEBUG("Not found a Spark");
-  };
-                
+  //while (!connect_to_all()) {
+  //  DEBUG("Not found a Spark");
+  //};
+  connect_to_all();
+              
   spark_state = SPARK_CONNECTED;     // it has to be to have reached here
   spark_ping_timer = millis();
   selected_preset = 0;

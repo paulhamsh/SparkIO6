@@ -242,7 +242,6 @@ bool connect_to_all() {
   pCharacteristic_receive = pService->createCharacteristic(S_CHAR1, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   pCharacteristic_send = pService->createCharacteristic(S_CHAR2, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY); 
 
-
   pCharacteristic_receive->setCallbacks(&chrCallbacks_r);
   pCharacteristic_send->setCallbacks(&chrCallbacks_s);
   pService->start();

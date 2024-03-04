@@ -35,7 +35,7 @@ typedef struct {
 } SparkMessage;
 
 
-
+/*
 SparkPreset my_preset{0x00,0x03,"F00DF00D-FEED-0123-4567-987654321004","Paul Preset","0.7","Nothing Here","icon.png",120.000000,{ 
   {"bias.noisegate", true, 2, {0.316873, 0.304245}}, 
   {"Compressor", false, 2, {0.341085, 0.665754}}, 
@@ -44,6 +44,6 @@ SparkPreset my_preset{0x00,0x03,"F00DF00D-FEED-0123-4567-987654321004","Paul Pre
   {"UniVibe", false, 3, {0.500000, 1.000000, 0.700000}}, 
   {"VintageDelay", true, 4, {0.152219, 0.663314, 0.144982, 1.000000}}, 
   {"bias.reverb", true, 7, {0.120109, 0.150000, 0.500000, 0.406755, 0.299253, 0.768478, 0.100000}} },0x00 };
-
+*/
 
 #endif
