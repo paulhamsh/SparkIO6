@@ -66,7 +66,7 @@ bool spark_state_tracker_start() {
   spark_state = SPARK_DISCONNECTED;
   ble_passthru = true;
   // try to find and connect to Spark - returns false if failed to find Spark
-  connect_to_all();
+  if (!connect_to_all()) return false;
                 
   spark_state = SPARK_CONNECTED;     // it has to be to have reached here
   spark_ping_timer = millis();
@@ -293,6 +293,43 @@ void update_ui() {
 
 // SparkBox specific
 void update_ui_hardware() {
+  bool got;
+  int p;
+  int i;
+  bool done;
+
+  done = false;
+  ble_passthru = false;
+
+  DEBUG("Updating UI for hardware");
+
+  while (i < 5) {
+    p = (i == 4) ? 0x7f: i;
+    app_msg_out.save_hardware_preset(0x00, p);
+    app_send();
+
+    got = wait_for_app(0x0201);
+    if (got) {
+      DEBUG("Got hardware preset ");
+      DEBUG(p);
+      presets[p].curr_preset = 0x00;
+      presets[p].preset_num = p;
+      app_msg_out.create_preset(&presets[p]);
+      app_send();
+      delay(100);
+      i++;
+    }
+    else {
+      DEBUG("Didn't capture the new preset");
+    }
+  }
+
+  app_msg_out.change_hardware_preset(0x00, 0x03);     
+  app_send();
+  app_msg_out.change_hardware_preset(0x00, 0x00);
+  app_send();
+
+  ble_passthru = true;
 
 };
 

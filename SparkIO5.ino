@@ -166,7 +166,7 @@ if (millis() - t > 10000 && do_it) {
     //p++;
     //if (p > 3) p = 0;
     
-    update_ui();
+    update_ui_hardware();
 
 
 /*
