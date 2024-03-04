@@ -156,7 +156,7 @@ bool  update_spark_state() {
   // and it is guaranteed that evaluation will stop as soon as the truth or falsehood is known.
   
   if (spark_msg_in.get_message(&cmdsub, &msg, &preset) || app_msg_in.get_message(&cmdsub, &msg, & preset)) {
-    DEBUG("Message: ");
+    DEB("Message: ");
     DEBUG(cmdsub, HEX);
 
     // all the processing for sync
@@ -169,7 +169,7 @@ bool  update_spark_state() {
           pres = 5;
         presets[pres] = preset;
         //dump_preset(&presets[pres]);
-        DEBUG("Got preset ");
+        DEB("Got preset ");
         DEBUG(pres);
         break;
       // change of amp model
@@ -303,20 +303,24 @@ void update_ui_hardware() {
 
   DEBUG("Updating UI for hardware");
 
-  while (i < 5) {
-    p = (i == 4) ? 0x7f: i;
-    app_msg_out.save_hardware_preset(0x00, p);
+  i = 0;
+
+  while (i < 4) {
+    //p = (i == 4) ? 0x7f: i;
+    app_msg_out.save_hardware_preset(0x00, i);
     app_send();
 
     got = wait_for_app(0x0201);
     if (got) {
-      DEBUG("Got hardware preset ");
-      DEBUG(p);
-      presets[p].curr_preset = 0x00;
-      presets[p].preset_num = p;
-      app_msg_out.create_preset(&presets[p]);
+      DEB("Got hardware preset request ");
+      DEB(msg.param2);
+      DEB(" Looking for: ");
+      DEBUG(i);
+      presets[i].curr_preset = 0x00;
+      presets[i].preset_num = i;
+      app_msg_out.create_preset(&presets[i]);
       app_send();
-      delay(100);
+      delay(1000);
       i++;
     }
     else {
@@ -330,7 +334,7 @@ void update_ui_hardware() {
   app_send();
 
   ble_passthru = true;
-
+  DEBUG("Updating UI for hardware - done");
 };
 
 ///// ROUTINES TO CHANGE AMP SETTINGS
