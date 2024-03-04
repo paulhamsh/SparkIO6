@@ -7,6 +7,12 @@ int preset_requested;
 bool preset_received;
 unsigned long sync_timer;
 
+// SparkBox specific
+int hw_preset_requested; // for UI sync of bank of presets
+bool hw_preset_received;
+unsigned long hw_preset_timer;
+
+
 int get_effect_index(char *str) {
   int ind, i;
 
@@ -60,11 +66,8 @@ bool spark_state_tracker_start() {
   spark_state = SPARK_DISCONNECTED;
   ble_passthru = true;
   // try to find and connect to Spark - returns false if failed to find Spark
-  //while (!connect_to_all()) {
-  //  DEBUG("Not found a Spark");
-  //};
   connect_to_all();
-              
+                
   spark_state = SPARK_CONNECTED;     // it has to be to have reached here
   spark_ping_timer = millis();
   selected_preset = 0;
@@ -178,6 +181,7 @@ bool  update_spark_state() {
         ind = get_effect_index(msg.str1);
         if (ind >= 0) 
           strcpy(presets[5].effects[ind].EffectName, msg.str2);
+          setting_modified = true;
         break;
       // effect on/off  
       case 0x0315:
@@ -185,6 +189,7 @@ bool  update_spark_state() {
         ind = get_effect_index(msg.str1);
         if (ind >= 0) 
           presets[5].effects[ind].OnOff = msg.onoff;
+          setting_modified = true;
         break;
       // change parameter value  
       case 0x0337:
@@ -192,17 +197,36 @@ bool  update_spark_state() {
         ind = get_effect_index(msg.str1);
         if (ind >= 0)
           presets[5].effects[ind].Parameters[msg.param1] = msg.val;
+        setting_modified = true;  
+        // SparkBox specific
+        strcpy(param_str, msg.str1);
+        param = msg.param1;
         break;  
       // change to preset  
       case 0x0338:
       case 0x0138:
         selected_preset = (msg.param2 == 0x7f) ? 4 : msg.param2;
         presets[5] = presets[selected_preset];
+        setting_modified = false;
+        // SparkBox specific
+        // Only update the displayed preset number for HW presets
+        if (selected_preset < 4){
+          display_preset_num = selected_preset; 
+        }                        
         break;
+      // Send licence key  
+      case 0x0170:
+        break; 
       // store to preset  
       case 0x0327:
         selected_preset = (msg.param2 == 0x7f) ? 4 : msg.param2;
         presets[selected_preset] = presets[5];
+        setting_modified = false;
+        // SparkBox specific
+        // Only update the displayed preset number for HW presets
+        if (selected_preset < 4){
+          display_preset_num = selected_preset; 
+        }  
         break;
       // current selected preset
       case 0x0310:
@@ -210,6 +234,25 @@ bool  update_spark_state() {
         if (msg.param1 == 0x01) 
           selected_preset = 5;
         presets[5] = presets[selected_preset];
+        // SparkBox specific
+        // Only update the displayed preset number for HW presets
+        if (selected_preset < 4){
+          display_preset_num = selected_preset; 
+        }
+        break;
+      case 0x0364:
+        // SparkBox specific
+        isTunerMode = true;
+        break;    
+         
+      case 0x0365:
+      case 0x0465:
+        // SparkBox specific
+        isTunerMode = false;
+        break;       
+      
+      case 0x0438:
+        setting_modified = false;
         break;
       default:
         break;
@@ -247,6 +290,11 @@ void update_ui() {
   }
   ble_passthru = true;
 }
+
+// SparkBox specific
+void update_ui_hardware() {
+
+};
 
 ///// ROUTINES TO CHANGE AMP SETTINGS
 
