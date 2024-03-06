@@ -135,10 +135,13 @@ unsigned int cmd_sub;
 SparkMessage message;
 SparkPreset pre;
 int p = 0;
+float v=60.0;
+
 
 void loop() {
   int len;
   int trim_len;
+
 
   // pre-wait before starting to request presets
   if (millis() - t > 10000 && !do_it) {
@@ -152,7 +155,7 @@ void loop() {
   };
 
 if (millis() - t > 10000 && do_it) {
-    Serial.println("Sending preset and update ui");
+    //Serial.println("Sending preset and update ui");
     //spark_message_out.create_preset(&my_preset);
     //spark_send();
     //spark_message_out.change_hardware_preset(0, p);
@@ -166,7 +169,13 @@ if (millis() - t > 10000 && do_it) {
     //p++;
     //if (p > 3) p = 0;
     
-    update_ui_hardware();
+    //update_ui_hardware();
+    Serial.print("Send tap tempo");
+    Serial.println(v);
+    spark_msg_out.send_tap_tempo(v);
+    spark_send();
+    v += 10.0;
+    if (v > 200.0) v = 60.0;
 
 
 /*
