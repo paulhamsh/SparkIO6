@@ -23,6 +23,7 @@ int preset_to_get;
 unsigned long t;
 bool do_it;
 
+int blk_size;
 byte new_block[2000];
 byte new_block2[2000];
 
@@ -47,6 +48,16 @@ void setup() {
   preset_to_get = 0;
 
   int new_len;
+
+
+/*  
+  spark_msg_out.get_preset_details(1);
+  spark_msg_out.copy_message_to_array(new_block, &blk_size);
+  new_len = expand(new_block2, new_block, blk_size);
+  add_bit_eight(new_block2, new_len);
+  new_len = add_headers(new_block, new_block2, new_len);
+  dump_processed_block(new_block, new_len);
+*/
 
 
 /*
@@ -149,10 +160,12 @@ void loop() {
     t = millis();
   };
 
+
   if (update_spark_state()) {
     t = millis();
     //Serial.println(cmdsub, HEX);
   };
+
 
 if (millis() - t > 10000 && do_it) {
     //Serial.println("Sending preset and update ui");

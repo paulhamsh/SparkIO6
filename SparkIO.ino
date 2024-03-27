@@ -67,6 +67,8 @@
  * Packet size                 173   (0xad)               106  (0x6a) 
  *
  */
+
+ 
 // UTILITY FUNCTIONS
 
 void uint_to_bytes(unsigned int i, uint8_t *h, uint8_t *l) {
@@ -176,7 +178,7 @@ void clone(byte *to, byte *from, int len) {
 
 // remove_headers())
 // Removes any headers (0x01fe and 0xf001) from the packets and leaves the rest
-// Each new data block starts with a 6 byte header
+// Each new data block starts with a 6 byte SparkIO header
 // 0  command
 // 1  sub-command
 // 2  total block length (inlcuding this header) (msb)
@@ -414,6 +416,11 @@ void app_process()
   }
 }
 
+void process_sparkIO() {
+  spark_comms_process();
+  spark_process();
+  app_process();
+}
 
 // ------------------------------------------------------------------------------------------------------------
 // MessageIn class
@@ -733,10 +740,12 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       Serial.print(len);
 
       Serial.print(":");
-      for (i = 0; i < len - 4; i++) {
-        read_byte(&junk);
-        Serial.print(junk, HEX);
-        Serial.print(" ");
+      if (len != 0) {
+        for (i = 0; i < len - 4; i++) {
+          read_byte(&junk);
+          Serial.print(junk, HEX);
+          Serial.print(" ");
+        }
       }
       Serial.println();
       // defensively clear the message buffer in case this is a bug
