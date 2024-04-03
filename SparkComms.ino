@@ -1,15 +1,6 @@
 #include "SparkComms.h"
 
 
-// Timer routines
-//#define TIMER 100000
-#define SPARK_TIMEOUT 200
-#ifdef CLASSIC
-#define APP_TIMEOUT 3000
-#else
-#define APP_TIMEOUT 400
-#endif
-
 //hw_timer_t *timer_sp = NULL;
 
 bool spark_timer_active = false;
@@ -40,12 +31,14 @@ void spark_comms_timer() {
         // mark this as good and wait for the receiver to clear the buffer
         got_spark_block = true;
         last_spark_was_bad = false;
+        DEBUG("Timeout on block, think I got a block");
       }
       else {
         got_spark_block = false;
         last_spark_was_bad = true;
         // clear the buffer
         from_spark_index = 0;  
+        DEBUG("Timeout on block, didn't get a block");
       }
     }  
   }
@@ -220,7 +213,7 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   // but it could also happen to be a standard size and the end of a block
   // in which case we set up a timer to catch it
 
-  if (length != 20 && length != 10 && length != 106) {
+  if (length != 20 && length != 10 && length != 19 && length != 106) {   // added 19 for Spark LIVE
     got_spark_block = true;
     spark_timer_active = false;
   }
