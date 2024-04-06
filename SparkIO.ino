@@ -581,7 +581,9 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
 
   *cmdsub = cs;
   switch (cs) {
-
+    case 0x0000:
+      DEBUG("GOT MESSAGE 0x0000 !!!"); 
+      break;
     // 0x02 series - requests
     // get preset information
     case 0x0201:
@@ -715,7 +717,6 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
         }
       }
       read_byte(&preset->chksum);  
-
       break;
     // tap tempo!
     case 0x0363:
@@ -732,14 +733,16 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0415:
     case 0x0438:
     case 0x0465:
-    case 0x0271:
-    case 0x0272:
     case 0x0472: 
     case 0x0474: 
     // Serial.print("Got an ack ");
     // Serial.println(cs, HEX);
       break;
-
+    case 0x0271:
+    case 0x0272:
+      DEB("Got ");
+      DEBUG(cs, HEX);
+      break;
 
     // LIVE messages  
 
@@ -771,14 +774,12 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_uint(&msg->param1); 
       break;
 
-
     // NOT PROPOERLY FORMED BELOW HERE 
-
 
     // LIVE includes 0x031a with 0x0338 with change to preset via HW Button
     // Not sure what this represents, but it is an array of: byte byte boolean
     case 0x031a:
-      DEBUG("LIVE message 0x031a");
+      DEB("LIVE message 0x031a   ");
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
       DEB("Fixed array size: ");
@@ -789,38 +790,45 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_onoff(&msg->bool1);
       read_byte(&msg->param3);
       read_byte(&msg->param4);
-      read_onoff(&msg->bool2);   
-      DEBUG(msg->param1);
-      DEBUG(msg->param2);
-      if (msg->bool1) DEBUG("On"); else DEBUG("Off");
-      DEBUG(msg->param3);
-      DEBUG(msg->param4);
-      if (msg->bool2) DEBUG("On"); else DEBUG("Off");
-      in_message.clear();   // clear rest of message as we haven't used it
+      read_onoff(&msg->bool2);  
+
+      DEB("LIVE hardware preset change ");
+      DEB(msg->param1);
+      DEB(" ");
+      DEB(msg->param2);
+      if (msg->bool1) DEB(" On "); else DEB(" Off ");
+      DEB(msg->param3);
+      DEB(" "); 
+      DEB(msg->param4);
+      if (msg->bool2) DEB(" On "); else DEB(" Off ");  
+      DEBUG(""); 
+      in_message.clear();        // clear rest of message as we haven't used it
       break;
     // LIVE INPUT 1 Guitar Volume
     case 0x036b:
-      DEB("LIVE INPUT 1 Guitar Volume ");
+      //DEB("LIVE INPUT 1 Guitar Volume ");
       read_float(&msg->val);
-      DEBUG(msg->val);
+      //DEBUG(msg->val);
       break;
     // LIVE Mixer
     case 0x0333:
-      DEB("LIVE Mixer ");
+      //DEB("LIVE Mixer ");
       read_float(&msg->val);
-      DEBUG(msg->val);
+     // DEBUG(msg->val);
       break;
     // LIVE INPUT 2 Cable Insert
     case 0x0374:
-      DEB("LIVE INPUT 2 Cable Insert");
+      DEB("LIVE INPUT 2 Cable Insert   ");
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
       DEB("Fixed array size: ");
-      DEBUG(num);
+      DEB(num);
+      DEB(" ");
       // Assume size 1 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
-      DEBUG(msg->param1);
+      DEB(msg->param1);
+      DEB(" ");
       DEBUG(msg->param1);
       in_message.clear();   // clear rest of message as we haven't used it
       break;
@@ -829,7 +837,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&num);
       num -= 0x90;  // should be a fixed array
       DEB("Fixed array size: ");
-      DEBUG(num);
+      DEB(num);
+      DEB(" ");
       // Assume size 2 for now
       read_byte(&msg->param1);
       read_byte(&msg->param2);
@@ -837,11 +846,15 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param3);
       read_byte(&msg->param4);
       read_onoff(&msg->bool2);   
-      DEBUG(msg->param1);
-      DEBUG(msg->param2);
-      if (msg->bool1) DEBUG("On"); else DEBUG("Off");
-      DEBUG(msg->param3);
-      DEBUG(msg->param4);
+      DEB(msg->param1);
+      DEB(" ");
+      DEB(msg->param2);
+      DEB(" ");
+      if (msg->bool1) DEB("On "); else DEB("Off ");
+      DEB(msg->param3);
+      DEB(" ");
+      DEB(msg->param4);
+      DEB(" ");
       if (msg->bool2) DEBUG("On"); else DEBUG("Off");
       in_message.clear();   // clear rest of message as we haven't used it
       break;
@@ -1078,6 +1091,10 @@ void MessageOut::write_onoff (bool onoff)
   write_byte(b);
 }
 
+void MessageOut::select_live_input_1 () {
+  start_message (0x0000);
+  end_message();
+}
 
 void MessageOut::change_effect_parameter (char *pedal, int param, float val)
 {
