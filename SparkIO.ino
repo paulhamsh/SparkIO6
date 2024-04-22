@@ -576,8 +576,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
   if (chksum_errors > 0) {
     DEBUG("Got a checksum error - need to skip this chunk");
     DEB(cmd, HEX); DEB(" ");
-    DEB(sub, HEX); DEB(" ");
-    DEB(chksum_errors, HEX); DEB(" ");
+    DEB(sub, HEX); DEB(" : ");
+    DEB(chksum_errors, HEX); DEB(" : ");
     DEB(sequence, HEX); DEB(" ");
     for (i = HEADER_LEN; i < len; i++) {
       read_byte(&junk);
@@ -605,13 +605,24 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
     case 0x0211:
       break;
     // get name - this is a request with no payload
-    case 0x0221:
-      break;
+    //case 0x0221:
+    //  break;
     // get serial number - this is a request with no payload
     case 0x0223:
       break;
+
+    case 0x022a:
+      // Checksum request (40 / GO / MINI)
+      // the data is a fixed array of four bytes (0x94 00 01 02 03)
+      read_byte(&junk);
+      read_uint(&msg->param1);
+      read_uint(&msg->param2);
+      read_uint(&msg->param3);
+      read_uint(&msg->param4);
+      break;   
+
     case 0x032a:
-    // Checksum response (40 / GO / MINI)
+      // Checksum response (40 / GO / MINI)
       // the data is a fixed array of four bytes (0x94 00 01 02 03)
       read_byte(&junk);
       read_uint(&msg->param1);
@@ -771,7 +782,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param3);
 
       DEB("LIVE set power setting ");
-      if (msg->bool1) DEB("battery "); else DEB("no battery ");
+      if (msg->bool1) DEB("true "); else DEB("false ");
       DEB(msg->param1);
       DEB(" ");
       DEBUG(msg->param3);
@@ -785,7 +796,7 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       read_byte(&msg->param3);
 
       DEB("LIVE power setting response ");
-      if (msg->bool1) DEB("battery "); else DEB("no battery ");
+      if (msg->bool1) DEB("true "); else DEB("false ");
       DEB(msg->param1);
       DEB(" ");
       DEBUG(msg->param3);
@@ -1043,8 +1054,8 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
       DEB("Unprocessed message ");
       DEB(cs, HEX);
       DEB(" length ");
-      DEB(len);
-
+      DEBUG(len);
+/*
       DEB(":");
       if (len != 0) {
         for (i = 0; i < len - 6; i++) {
@@ -1054,14 +1065,16 @@ bool MessageIn::get_message(unsigned int *cmdsub, SparkMessage *msg, SparkPreset
         }
       }
       DEBUG();
+*/
       // defensively clear the message buffer in case this is a bug
       in_message.clear();
   }
 
+  /*
   if (!in_message.is_empty()) {
     DEBUG("SparkIO: Still something in in_message after processing ");
   }
-
+  */
   return true;
 }
 
@@ -1241,11 +1254,6 @@ void MessageOut::write_onoff (bool onoff)
   write_byte(b);
 }
 
-void MessageOut::select_live_input_1 () {
-  start_message (0x0000);
-  end_message();
-}
-
 void MessageOut::change_effect_parameter (char *pedal, int param, float val)
 {
    if (cmd_base == 0x0100) 
@@ -1388,6 +1396,7 @@ void MessageOut::send_ack(unsigned int cmdsub) {
    end_message();
 }
 
+/*
 void MessageOut::send_0x022a_info(byte v1, byte v2, byte v3, byte v4)
 {
    start_message (0x022a);
@@ -1398,6 +1407,7 @@ void MessageOut::send_0x022a_info(byte v1, byte v2, byte v3, byte v4)
    write_uint(v4);      
    end_message();
 }
+*/
 
 void MessageOut::send_key_ack()
 {

@@ -124,6 +124,12 @@ bool spark_state_tracker_start() {
   if (got) DEBUG("Got checksum");
   else DEBUG("Failed to get checksum");
 
+  // Get serial number
+  spark_msg_out.get_serial();
+  spark_send();
+  got = wait_for_spark(0x0323);
+  if (got) DEBUG("Got serial number");
+  else DEBUG("Failed to get serial number");
 
   // Get the presets
   preset_to_get = 0x0000;
@@ -143,7 +149,7 @@ bool spark_state_tracker_start() {
 
       DEB("Got preset: "); 
       DEBUG(pres);
-      dump_preset(presets[pres][0]);
+      //dump_preset(presets[pres][0]);
       
       preset_to_get++;
       if (preset_to_get > max_preset + 0x0000) preset_to_get = 0x0100;
@@ -173,7 +179,7 @@ bool spark_state_tracker_start() {
 
       DEB("Got preset: "); 
       DEBUG(pres);
-      dump_preset(presets[pres][1]);
+      //dump_preset(presets[pres][1]);
       
       preset_to_get++;
       if (preset_to_get > max_preset + 0x0300) preset_to_get = 0x0400;
@@ -595,7 +601,9 @@ void change_custom_preset(SparkPreset *preset, int pres_num) {
     presets[pres_num][current_input] = *preset;
     
     spark_msg_out.create_preset(preset);
+    spark_send();  
     spark_msg_out.change_hardware_preset(0, preset->preset_num);
+    spark_send();  
   }
 }
 

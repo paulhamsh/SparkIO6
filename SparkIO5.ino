@@ -120,6 +120,7 @@ void setup() {
 */
 }
 
+/*
 void dump_preset(SparkPreset *p){
   Serial.print(p->curr_preset); Serial.print(" ");
   Serial.println(p->preset_num); 
@@ -141,6 +142,7 @@ void dump_preset(SparkPreset *p){
   }
   Serial.println();
 }
+*/
 
 unsigned int cmd_sub;
 SparkMessage message;
@@ -152,8 +154,18 @@ float v=60.0;
 void loop() {
   int len;
   int trim_len;
+  bool got;
 
+  Serial.println("Try for serial number");
+    // Get serial number
+  spark_msg_out.get_serial();
+  spark_send();
+  got = wait_for_spark(0x0323);
+  if (got) DEBUG("Got serial number");
+  else DEBUG("Failed to get serial number");
 
+  delay(1000);
+/*
   // pre-wait before starting to request presets
   if (millis() - t > 10000 && !do_it) {
     do_it = true;
@@ -165,8 +177,9 @@ void loop() {
     t = millis();
     //Serial.println(cmdsub, HEX);
   };
+*/
 
-
+/*
 if (millis() - t > 10000 && do_it) {
     //Serial.println("Sending preset and update ui");
     //spark_message_out.create_preset(&my_preset);
@@ -189,7 +202,7 @@ if (millis() - t > 10000 && do_it) {
     spark_send();
     v += 10.0;
     if (v > 200.0) v = 60.0;
-
+*/
 
 /*
   bool got;
@@ -218,9 +231,9 @@ if (millis() - t > 10000 && do_it) {
   }
 */
 
-    t = millis();
+//    t = millis();
     
-  };
+//  };
 
 
 /*
