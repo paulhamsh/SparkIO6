@@ -3,11 +3,11 @@
 
 // Timer routines
 //#define TIMER 100000
-#define SPARK_TIMEOUT 200
+#define SPARK_TIMEOUT 1000
 #ifdef CLASSIC
-#define APP_TIMEOUT 3000
+#define APP_TIMEOUT 1000
 #else
-#define APP_TIMEOUT 400
+#define APP_TIMEOUT 1000
 #endif
 
 
@@ -17,7 +17,7 @@ enum {S40, MINI, GO, LIVE} spark_type = MINI;
 char spark_ble_name[SIZE_BLE_NAME + 1];
 char spark_bt_name[SIZE_BLE_NAME + 1];
 
-#define BLE_DUMP 
+//#define BLE_DUMP 
 
 #define DEBUG_ON
 
@@ -38,6 +38,17 @@ char spark_bt_name[SIZE_BLE_NAME + 1];
 //#define SPARK_BT_NAME "Spark LIVE Audio"
 #define DEFAULT_SPARK_BLE_NAME "Spark 40 BLE"
 
+
+QueueHandle_t qFromApp;
+QueueHandle_t qFromSpark;
+QueueHandle_t qFromAppFilter;
+QueueHandle_t qFromSparkFilter;
+
+struct packet_data {
+  uint8_t *ptr;
+  int size;
+};
+
 #ifdef CLASSIC
 #include "BluetoothSerial.h"
 #include <BLEDevice.h>
@@ -51,20 +62,6 @@ BluetoothSerial *bt;
 #endif
 
 #define BLE_BUFSIZE 2000
-
-byte app_to_spark_data[BLE_BUFSIZE];
-int app_to_spark_len = 0;
-
-
-byte from_app[BLE_BUFSIZE];
-int from_app_index = 0;
-bool got_app_block;
-bool last_app_was_bad;
-
-byte from_spark[BLE_BUFSIZE];
-int from_spark_index = 0;
-bool got_spark_block;
-bool last_spark_was_bad;
 
 bool ble_passthru;
 

@@ -1,100 +1,26 @@
 #include "SparkComms.h"
 
-
-//hw_timer_t *timer_sp = NULL;
-
-bool spark_timer_active = false;
-unsigned long last_spark_time;
-
-bool app_timer_active = false;
-unsigned long last_app_time;
-
-
-
-#define PASSTHRU_TABLE_SIZE 30
-
-int passthru_packet_index = 0;
-int passthru_packet_start[PASSTHRU_TABLE_SIZE];
-int passthru_packet_length[PASSTHRU_TABLE_SIZE];
-
-//SemaphoreHandle_t xFromAppMutex = NULL;  // Create a mutex object
-QueueHandle_t qAppToSpark;
-
-
-// this is to catch a good block that ends on a 10, 20 or 106 byte boundary via a timeout
-//void ARDUINO_ISR_ATTR timer_cb_sp() {
-void spark_comms_timer() {
-  if (spark_timer_active && (millis() - last_spark_time > SPARK_TIMEOUT)) {
-    spark_timer_active = false;
-    if (from_spark_index != 0) {
-      if (from_spark[from_spark_index-1] == 0xf7) {
-        // mark this as good and wait for the receiver to clear the buffer
-        got_spark_block = true;
-        last_spark_was_bad = false;
-        DEBUG("Timeout on spark block - does end in f7");
-      }
-      else {
-        got_spark_block = false;
-        last_spark_was_bad = true;
-        // clear the buffer
-        from_spark_index = 0;  
-        DEBUG("Timeout on spark block - does NOT end in f7");
-      }
-    }  
-  }
-
-  if (app_timer_active && (millis() - last_app_time > APP_TIMEOUT)) {
-    app_timer_active = false;
-    if (from_app_index != 0) {
-      if (from_app[from_app_index-1] == 0xf7) {
-        // mark this as good and wait for the receiver to clear the buffer
-        got_app_block = true;
-        last_app_was_bad = false;
-        DEBUG("Timeout on app block - does end in f7");
-      }
-      else {
-        got_app_block = false;
-        last_app_was_bad = true;
-        // clear the buffer
-        from_app_index = 0;  
-        DEBUG("Timeout on app block - does NOT end in f7");
-      }
-    }  
-  }
-}
-
-void spark_comms_process() {
-  int packets_waiting;
-  int i;
-  int index;
-  int len, pos;
-
-  // process the 
-  spark_comms_timer();
-  
-  // do passthru to app
-  // it seems to be important to send all queued packets close together else the app gets disconnected - especially the 170 message
-  while (uxQueueMessagesWaiting(qAppToSpark) > 0) {
-    xQueueReceive(qAppToSpark, &index, (TickType_t) 0);
-    //Serial.print(index);
-    //Serial.println();
-    len = passthru_packet_length[index];
-    if (len != 0) {
-      pos = passthru_packet_start[index];
-      //Serial.print("Sending passthru ");
-      //Serial.print(index);
-      //Serial.print(" : ");
-      //Serial.print(pos);
-      //Serial.print(" : ");
-      //Serial.println(len);
-      pSender_sp->writeValue((uint8_t *) &from_app[pos], len, false);    
-      passthru_packet_length[index] = 0;
-    }
-  }
-}
-
-
 const uint8_t notifyOn[] = {0x1, 0x0};
+
+struct packet_data packet_spark;
+struct packet_data packet_app;
+unsigned long lastAppPacketTime;
+unsigned long lastSparkPacketTime;
+
+// read from queue, pass-through to amp then check for a complete valid message to send on for processing
+void setup_comms() {
+  packet_spark.size = 0;
+  packet_app.size = 0;
+
+  lastAppPacketTime = millis();
+  lastSparkPacketTime = millis();
+
+  qFromApp         = xQueueCreate(20, sizeof (struct packet_data));
+  qFromSpark       = xQueueCreate(20, sizeof (struct packet_data));
+
+  qFromAppFilter   = xQueueCreate(20, sizeof (struct packet_data));
+  qFromSparkFilter = xQueueCreate(20, sizeof (struct packet_data));
+}
 
 // client callback for connection to Spark
 
@@ -126,6 +52,9 @@ class MyServerCallback : public BLEServerCallbacks {
   void onDisconnect(BLEServer *pserver) {
     ble_app_connected = false;
     DEBUG("App disconnected");
+    #ifdef CLASSIC
+      pAdvertising->start(); 
+    #endif
   }
 };
 
@@ -144,26 +73,6 @@ void bt_callback(esp_spp_cb_event_t event, esp_spp_cb_param_t *param){
   }
 }
 #endif
-
-
-
-
-// Blocks sent to the app are max length 0xad or 173 bytes. This includes the 16 byte block header.
-// Without that header the block is 157 bytes.
-// For Spark 40 BLE they are sent as 100 bytes then 73 bytes.
-// 
-// From the amp, max size is 0x6a or 106 bytes (90 bytes plus 16 byte block header).
-// For the Spark 40 these are sent in chunk of 106 bytes.
-// MINI and GO do not use the block header so just transmit 90 bytes.
-// From the MINI and GO, they are sent in chunks of 20 bytes up to the 90 bytes (so 20 + 20 + 20 + 20 + 10). 
-// 
-//
-// Chunks sent from the amp have max size of 39 bytes, 0x27.
-// This is 6 byte header, 1 byte footer, 4 data chunks of 7 bytes, 4 '8 bit' bytes. So 6 + 1 +32 = 39.
-// Because of the multi-chunk header of 3 bytes, there are 32 - 3 = 29 data bytes (0x19)
-//
-// Example
-// F0 01 04 1F 03 01   20  0E 00 19  00 00 59 24   00 39 44 32 46 32 41 41   00 33 2D 34 45 43 35 2D   00 34 42 44 37 2D 41 33   F7
 
 
 // From the Spark
@@ -189,118 +98,24 @@ void notifyCB_sp(BLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pData,
   DEBUG();
 #endif
 
-
-  //if (got_spark_block) DEBUG("Oh no - spark block not cleared");
-
-  // copy to the buffer
-  if (from_spark_index + length < BLE_BUFSIZE) {
-    memcpy(&from_spark[from_spark_index], pData, length);
-    from_spark_index += length; 
-  }
-  else {
-    from_spark_index = 0;
-    last_spark_was_bad = true;
-    DEBUG("Exceeded block size");
-  }
-
-  // passthru
-  if (ble_passthru && ble_app_connected) {
-    pCharacteristic_send->setValue(pData, length);
-    pCharacteristic_send->notify(true);
-  }
-
-  #ifdef CLASSIC
-  if (ble_passthru && bt_app_connected) {
-    bt->write(pData, length);
-  }
-  #endif
-
-  // check to see if this is the end of a block - if not a standard packet size (20, 10, 106) then it definitely is
-  // but it could also happen to be a standard size and the end of a block
-  // in which case we set up a timer to catch it
-
-  if (from_spark[from_spark_index-1] == 0xf7 && (length != 20 && length != 10 && length != 19 && length != 106)) {   // added 19 for Spark LIVE
-    got_spark_block = true;
-    spark_timer_active = false;
-    DEBUG("Found end of block");
-  }
-  else {
-    last_spark_time = millis();
-    spark_timer_active = true;
-  }
+  struct packet_data qe;
+  new_packet_from_data(&qe, pData, length);
+  xQueueSend (qFromSpark, &qe, (TickType_t) 0);
 }
 
-// From the app
 
 class CharacteristicCallbacks: public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
+    std::string s = pCharacteristic->getValue(); 
+    int size = s.size();
+    const char *buf = s.c_str();
 
+    //DEB("Got BLE callback size: ");
+    //DEBUG(size);
 
-    //if (got_app_block) DEBUG("Oh no - app block not cleared");
-
-    // copy to the buffer 
-    std::string s = pCharacteristic->getValue();  // do this to avoid the issue here: https://github.com/h2zero/NimBLE-Arduino/issues/413
-    int length = s.size();
-    const char *data = s.c_str();
-    int index = from_app_index;
-
-  DEB("Got BLE callback size: ");
-  DEBUG(length);
-
-#ifdef BLE_DUMP
-    int i = 0;
-    byte b;
-    DEB("FROM APP:          ");
-    for (i=0; i < length; i++) {
-      b = data[i];
-      if (b < 16) DEB("0");
-      DEB(b, HEX);    
-      DEB(" ");
-      if (i % 32 == 31) { 
-        DEBUG("");
-        DEB("                   ");
-      }   
-    }
-    DEBUG();
-#endif
-
-    if (from_app_index + length < BLE_BUFSIZE) {
-      memcpy(&from_app[from_app_index], data, length);
-      from_app_index += length;
-    }
-    else {
-      from_app_index = 0;
-      last_app_was_bad = true;
-      DEBUG("Exceeded app block size");
-    }
-
-    // passthru
-    if (ble_passthru) {
-      #ifdef CLASSIC 
-        passthru_packet_start[passthru_packet_index] = index;
-        passthru_packet_length[passthru_packet_index] = length;
-        xQueueSend(qAppToSpark, &passthru_packet_index, (TickType_t) 0);
-        passthru_packet_index++;
-        if (passthru_packet_index >= PASSTHRU_TABLE_SIZE) 
-          passthru_packet_index = 0;
-      #else
-        pSender_sp->writeValue((uint8_t *) s.c_str(), length, false);
-      #endif
-    }
-
-    // For Spark 40,  MINI and GO will be 100 then 73 for a block of 173 
-    // Seems Android app has small blocks though
-    if (from_app[from_app_index-1] == 0xf7 && (length != 100 && length != 73 && length != 20  && length != 10 && length != 19 && length != 106)) // added more to cope with Android BLE using smaller packets frrom the app
-    {    
-      got_app_block = true;
-      app_timer_active = false;
-      DEBUG("Found end of block");
-    }
-    else {
-      last_app_time = millis();
-      app_timer_active = true;
-    }
-
+    struct packet_data qe;
+    new_packet_from_data(&qe, (uint8_t *) buf, size);
+    xQueueSend (qFromApp, &qe, (TickType_t) 0);
   };
 };
 
@@ -309,10 +124,10 @@ static CharacteristicCallbacks chrCallbacks_s, chrCallbacks_r;
 
 // Serial BT callback for data
 void data_callback(const uint8_t *buffer, size_t size) {
-  int index = from_app_index;
+//  int index = from_app_index;
 
-  DEB("Got SerialBT callback size: ");
-  DEBUG(size);
+  //DEB("Got SerialBT callback size: ");
+  //DEBUG(size);
 
 #ifdef BLE_DUMP
     int i = 0;
@@ -331,52 +146,10 @@ void data_callback(const uint8_t *buffer, size_t size) {
     DEBUG();
 #endif
 
+    struct packet_data qe;
+    new_packet_from_data(&qe, (uint8_t *) buffer, size);
+    xQueueSend (qFromApp, &qe, (TickType_t) 0);
 
-  if (got_app_block && from_app_index > 0) DEBUG("GOT APP BLOCK TRUE AND FROM_APP_INDEX IS NOT ZERO");
-
-  if (from_app_index + size < BLE_BUFSIZE) {
-    memcpy(&from_app[from_app_index], buffer, size);
-    //for (int i=0; i < length; i++) {Serial.print(" "); Serial.print(from_app[from_app_index + i], HEX);}
-    //Serial.println();
-    from_app_index += size;
-  }
-  else {
-    from_app_index = 0;
-    last_app_was_bad = true;
-    DEBUG("Exceeded app block size");
-  }
-
-
-  // passthru
-  if (ble_passthru) {
-    passthru_packet_start[passthru_packet_index] = index;
-    passthru_packet_length[passthru_packet_index] = size;
-    xQueueSend(qAppToSpark, &passthru_packet_index, (TickType_t) 0);
-    passthru_packet_index++;
-    if (passthru_packet_index >= PASSTHRU_TABLE_SIZE) 
-      passthru_packet_index = 0;
-  }
-  
-  /*
-  // passthru
-  if (ble_passthru) {
-    passthru_packet_start[passthru_packet_index] = index;
-    passthru_packet_length[passthru_packet_index] = size;
-    passthru_packet_index++;
-  }
-  */
-
-  //if (size != 173) {
-  if (from_app[from_app_index-1] == 0xf7 && (size != 100 && size != 73 && size != 20  && size != 10 && size != 19 && size != 106)) // added more to cope with Android BLE using smaller packets frrom the app  
-  {
-    got_app_block = true;
-    app_timer_active = false;
-    DEBUG("Found end of block");
-  }
-  else {
-    last_app_time = millis();
-    app_timer_active = true;
-  }
 }
 
 
@@ -419,17 +192,15 @@ void connect_spark() {
 
 
 
-
-
-
 bool connect_to_all() {
   int i, j;
   int counts;
   uint8_t b;
   int len;
 
-  //xFromAppMutex = xSemaphoreCreateMutex();
-  qAppToSpark = xQueueCreate(5, sizeof(int));
+
+  // init comms processing
+  setup_comms();
 
   strcpy(spark_ble_name, DEFAULT_SPARK_BLE_NAME);
   ble_spark_connected = false;
@@ -564,13 +335,6 @@ bool connect_to_all() {
   //pAdvertising->setManufacturerData(manuf_data);
   pAdvertising->start(); 
 
-  // timers for timeout
-  //setup_timer_sp();
-
-  // flags for data availability
-  got_app_block = false;
-  got_spark_block = false;
-
   return true;
 }
 
@@ -585,7 +349,7 @@ void send_to_app(byte *buf, int len) {
     pCharacteristic_send->notify(true);
   }
 #if defined CLASSIC
-  else {
+  if (bt_app_connected) {
     bt->write(buf, len);
   }
 #endif
