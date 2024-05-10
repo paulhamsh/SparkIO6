@@ -245,6 +245,7 @@ void clear_packet(struct packet_data *pd) {
   pd->size = 0; 
 }
 
+/*
 void append_packet(struct packet_data *pd, struct packet_data *add) {
   if (pd->size == 0)
     pd->ptr = (uint8_t *)  malloc_check(add->size);
@@ -253,7 +254,8 @@ void append_packet(struct packet_data *pd, struct packet_data *add) {
   memcpy (&pd->ptr[pd->size], add->ptr, add->size);
   pd->size += add->size;
 }
-
+*/
+/*
 void remove_packet_start(struct packet_data *pd, int end) {
   if (end == pd->size - 1) {
     // processed the whole block
@@ -273,6 +275,7 @@ void remove_packet_start(struct packet_data *pd, int end) {
     pd->size = new_size;
   }
 }
+*/
 
 // ------------------------------------------------------------------------------------------------------------
 // Routines to handle validating packets of data from SparkComms before further processing
@@ -313,12 +316,12 @@ bool scan_packet (CircularArray &buf, int *start, int *this_end, int end) {
     }
  
     // skip a block header if we find one
-    else if (buf[p] == 0x01 && buf[p + 1] == 0xfe) {
+    else if (end - p >= 2 && buf[p] == 0x01 && buf[p + 1] == 0xfe) {
       p += 16;
     }
     
     // found start of a message - either single or multi-chunk
-    else if (buf [p] == 0xf0 && buf[p + 1] == 0x01 && (end - p >= 6)) {
+    else if (end - p >= 6 && buf [p] == 0xf0 && buf[p + 1] == 0x01) {
 
       //DEBUG_COMMS("Pos %3d: new header", p);
       found_chunk = true;
@@ -332,7 +335,7 @@ bool scan_packet (CircularArray &buf, int *start, int *this_end, int end) {
       else
        is_multi = false;
     
-      if (is_multi && (end - p >= 9)) {
+      if (is_multi && end - p >= 9) {
         multi_total_chunks = buf[p + 7] | (buf[p + 6] & 0x01? 0x80 : 0x00);         
         multi_this_chunk   = buf[p + 8] | (buf[p + 6] & 0x02? 0x80 : 0x00);
         is_first_multi = (multi_this_chunk == 0);
@@ -432,8 +435,7 @@ void handle_spark_packet() {
       len = compact(array_spark, array_spark, trim_len);
 
       new_packet(&me, len);
-      me.size = array_spark.extract(me.ptr, len);
-
+      me.size = array_spark.extract(me.ptr, len, orig_len);
       xQueueSend (spark_msg_in.qList, &me, (TickType_t) 0);
     }
   }
@@ -488,8 +490,7 @@ void handle_app_packet() {
       len = compact(array_app, array_app, trim_len);
 
       new_packet(&me, len);
-      me.size = array_app.extract(me.ptr, len);
-
+      me.size = array_app.extract(me.ptr, len, orig_len);
       xQueueSend (app_msg_in.qList, &me, (TickType_t) 0);
     }
   }

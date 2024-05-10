@@ -102,24 +102,26 @@ int CircularArray::length() {
     return le;
   }
 
-  int CircularArray::extract(uint8_t *data, int len) {
-    int le;
+  int CircularArray::extract(uint8_t *data, int len_to_copy, int len_to_shrink) {
     int i;
 
     // check length
-    le = len;
-    if (len > length()) {
-      le = length();
-      DEBUG_ARRAY("Trying to extract too much: %d limited to %d", len, le);
+    if (len_to_copy > length()) {
+      len_to_copy = length();
+      DEBUG_ARRAY("Trying to extract too much, limited to %d", len_to_copy);
     }
     // copy
-    for (i = 0; i < le; i++) {
+    for (i = 0; i < len_to_copy; i++) {
       data[i] = buf[(start + i) % size];
     }
     // shrink
-    start += le;
+    if (len_to_shrink > length()) {
+      len_to_shrink = length();
+      DEBUG_ARRAY("Trying to shink too much, limited to %d", len_to_shrink);
+    }
+    start += len_to_shrink;
     if (start > size) start -= size; 
-    return le;
+    return len_to_copy;
   }
 
   void CircularArray::show() {

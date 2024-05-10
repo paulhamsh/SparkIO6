@@ -19,7 +19,7 @@ class CircularArray
   int copy_in(uint8_t *data, int index, int len);
   int copy_out(uint8_t *data, int index, int len);
   int append(uint8_t *data, int len);
-  int extract(uint8_t *data, int len);
+  int extract(uint8_t *data, int len_to_copy, int len_to_shrink);
   void show();
   void clear();
 };
