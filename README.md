@@ -1,4 +1,4 @@
-# SparkIO5
+# SparkIO6
 ## Updated Spark BLE classes for ESP32
 
 ## Revised SparkIO for GO and MINI compatibility
