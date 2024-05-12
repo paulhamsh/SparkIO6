@@ -13,7 +13,7 @@ void setup() {
 
 
 void loop() {
-  if (update_spark_state() {
+  if (update_spark_state()) {
     Serial.print("Got message ");
     Serial.println(cmdsub, HEX);
   }
