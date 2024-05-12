@@ -2,7 +2,6 @@
 
 #define DEBUG_ARRAY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.println(_b);}
 #define DEB_ARRAY(...)  {char _b[100]; sprintf(_b, __VA_ARGS__); Serial.print(_b);}
-
 //define DEBUG_ARRAY(...) {}
 //define DEB_ARRAY(...) {}
 
@@ -81,8 +80,8 @@ int CircularArray::length() {
     }
     return le;
   }
-
 */
+
   int CircularArray::append(uint8_t *data, int len) {
     int le;
     int i;
@@ -138,7 +137,7 @@ int CircularArray::length() {
       DEBUG_ARRAY("Trying to append too much, limited to %d", len_to_copy);
     }
     // copy
-    for (i = 0; i < len_to_copy; i++) {
+    for (int i = 0; i < len_to_copy; i++) {
       to.buf[(to.end + i) % to.size] = buf[(start + i) % size];
     }
     // expand destination
