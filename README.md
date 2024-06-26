@@ -1,7 +1,9 @@
 # SparkIO6
 ## Updated Spark BLE classes for ESP32
 
-## Revised SparkIO for GO and MINI compatibility
+## Revised SparkIO for GO, MINI and LIVE compatibility
+
+Includes new LIVE-only messages and updated Protocol description document.   
 
 ## Key changes
 
